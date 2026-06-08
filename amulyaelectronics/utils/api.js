@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────
 import axios from "axios";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000';
 
 const api = axios.create({
   baseURL: BACKEND_URL,
@@ -13,8 +13,8 @@ const api = axios.create({
 
 // Attach token from localStorage on every request
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  const token = localStorage.getItem("amulya_token");
+  if (token) config.headers.token = token;
   return config;
 });
 

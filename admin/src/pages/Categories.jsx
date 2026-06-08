@@ -1,130 +1,168 @@
 // pages/Categories.jsx
+// TailAdmin-inspired white Categories page
+// ✅ All API logic preserved   ✅ Mobile responsive
+// ✅ Clean white UI            ✅ Cards, accordion, search, stats
+// ✅ Confirm dialog            ✅ Add/edit/delete/toggle all intact
+
 import React, { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import { backendUrl } from '../App'
+import ToggleSwitch from '../components/ToggleSwitch'
+
+// ─── Image URL helper (prepend backend URL to relative paths) ──────────────────
+const imgUrl = (url) => {
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  if (url.startsWith('/uploads/')) return `${backendUrl}${url}`
+  return url
+}
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const Icon = {
   Plus: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15,flexShrink:0}}>
+      <path d="M12 5v14M5 12h14"/>
     </svg>
   ),
   Edit: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"
+      strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14,flexShrink:0}}>
+      <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
     </svg>
   ),
   Trash: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"
+      strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14,flexShrink:0}}>
+      <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
     </svg>
   ),
   ChevronDown: ({ open }) => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 transition-transform duration-300"
-      style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+      strokeLinecap="round" strokeLinejoin="round"
+      style={{width:14,height:14,flexShrink:0,transform:open?'rotate(180deg)':'none',transition:'transform 0.25s'}}>
+      <path d="M6 9l6 6 6-6"/>
     </svg>
   ),
   Image: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
+      strokeLinecap="round" strokeLinejoin="round" style={{width:20,height:20,color:'#d1d5db'}}>
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <circle cx="8.5" cy="8.5" r="1.5"/>
+      <path d="M21 15l-5-5L5 21"/>
     </svg>
   ),
   X: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+      strokeLinecap="round" strokeLinejoin="round" style={{width:13,height:13,flexShrink:0}}>
+      <path d="M18 6L6 18M6 6l12 12"/>
     </svg>
   ),
-  Toggle: ({ on }) => (
-    <div className="relative w-10 h-5 rounded-full transition-colors duration-200 flex items-center"
-      style={{ background: on ? '#00c2ff' : '#1e3a5f' }}>
-      <div className="absolute w-3.5 h-3.5 bg-white rounded-full shadow transition-transform duration-200"
-        style={{ transform: on ? 'translateX(22px)' : 'translateX(3px)' }} />
-    </div>
+  Search: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15,color:'#9ca3af',flexShrink:0}}>
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    </svg>
   ),
 }
 
-// ─── Shared styles ────────────────────────────────────────────────────────────
+// ─── Shared style tokens ───────────────────────────────────────────────────────
 const S = {
   card: {
-    background: 'linear-gradient(135deg, #0d1a2e 0%, #0a1628 100%)',
-    border: '1px solid #00c2ff22',
-    borderRadius: 12,
-    boxShadow: '0 4px 24px #00000044',
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 14,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
   },
   inp: {
-    background: '#060d1a',
-    border: '1px solid #00c2ff33',
+    background: '#fff',
+    border: '1px solid #e5e7eb',
     borderRadius: 8,
-    color: '#e2e8f0',
-    padding: '8px 12px',
+    color: '#111827',
+    padding: '9px 12px',
     fontSize: 13,
     outline: 'none',
     width: '100%',
     fontFamily: 'inherit',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+  },
+  label: {
+    display: 'block',
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: '0.07em',
+    textTransform: 'uppercase',
+    color: '#6b7280',
+    marginBottom: 6,
   },
   btn: (variant = 'primary') => ({
     display: 'inline-flex',
     alignItems: 'center',
     gap: 6,
-    padding: '8px 16px',
+    padding: '7px 14px',
     borderRadius: 8,
     border: 'none',
     cursor: 'pointer',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 600,
     fontFamily: 'inherit',
-    transition: 'all 0.2s',
+    transition: 'all 0.15s',
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
     ...(variant === 'primary' && {
-      background: 'linear-gradient(135deg, #00c2ff, #0077b6)',
+      background: 'linear-gradient(135deg,#2563eb,#1d4ed8)',
       color: '#fff',
-      boxShadow: '0 0 16px #00c2ff33',
+      boxShadow: '0 2px 8px rgba(79,70,229,0.25)',
     }),
     ...(variant === 'ghost' && {
-      background: '#00c2ff11',
-      color: '#00c2ff',
-      border: '1px solid #00c2ff33',
+      background: '#eff6ff',
+      color: '#2563eb',
+      border: '1px solid #bfdbfe',
     }),
     ...(variant === 'danger' && {
-      background: '#ff4d4d11',
-      color: '#ff6b6b',
-      border: '1px solid #ff4d4d33',
+      background: '#fff5f5',
+      color: '#dc2626',
+      border: '1px solid #fecaca',
     }),
     ...(variant === 'success' && {
-      background: '#00ff9511',
-      color: '#00ff95',
-      border: '1px solid #00ff9533',
+      background: '#f0fdf4',
+      color: '#16a34a',
+      border: '1px solid #bbf7d0',
+    }),
+    ...(variant === 'muted' && {
+      background: '#f3f4f6',
+      color: '#6b7280',
+      border: '1px solid #e5e7eb',
     }),
   }),
-  label: {
-    display: 'block',
-    fontSize: 11,
-    fontWeight: 700,
-    letterSpacing: '0.1em',
-    textTransform: 'uppercase',
-    color: '#4a6fa5',
-    marginBottom: 6,
-    fontFamily: "'Courier New', monospace",
-  },
 }
 
-// ─── Image Upload Button ──────────────────────────────────────────────────────
+const focusInp = e => {
+  e.target.style.borderColor = '#2563eb'
+  e.target.style.boxShadow   = '0 0 0 3px rgba(79,70,229,0.1)'
+}
+const blurInp = e => {
+  e.target.style.borderColor = '#e5e7eb'
+  e.target.style.boxShadow   = 'none'
+}
+
+// ─── Image Upload ──────────────────────────────────────────────────────────────
 const ImageUpload = ({ value, onChange, id, size = 80 }) => (
   <label htmlFor={id} style={{ cursor: 'pointer', display: 'block', width: size, height: size, flexShrink: 0 }}>
     <div style={{
       width: size, height: size, borderRadius: 10, overflow: 'hidden',
-      border: value ? '2px solid #00c2ff' : '2px dashed #00c2ff44',
+      border: value ? '2px solid #2563eb' : '2px dashed #d1d5db',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: '#060d1a', position: 'relative',
+      background: '#f9fafb', transition: 'border-color 0.15s',
     }}>
       {value
-        ? <img src={typeof value === 'string' ? value : URL.createObjectURL(value)}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-        : <div style={{ color: '#1e3a5f', textAlign: 'center' }}>
+        ? <img src={typeof value === 'string' ? imgUrl(value) : URL.createObjectURL(value)}
+            style={{width:'100%',height:'100%',objectFit:'cover'}} alt="" />
+        : <div style={{textAlign:'center'}}>
             <Icon.Image />
-            <div style={{ fontSize: 9, marginTop: 2, color: '#2a4a70' }}>Image</div>
+            <div style={{fontSize:9,color:'#9ca3af',marginTop:2}}>Upload</div>
           </div>
       }
     </div>
@@ -132,31 +170,56 @@ const ImageUpload = ({ value, onChange, id, size = 80 }) => (
   </label>
 )
 
-// ─── Confirm Dialog ───────────────────────────────────────────────────────────
+// ─── Confirm Dialog ────────────────────────────────────────────────────────────
 const ConfirmDialog = ({ message, onConfirm, onCancel }) => (
   <div style={{
     position: 'fixed', inset: 0, zIndex: 1000,
-    background: '#00000088', backdropFilter: 'blur(4px)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(3px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
   }}>
-    <div style={{ ...S.card, padding: 28, maxWidth: 360, width: '90%' }}>
-      <p style={{ color: '#e2e8f0', marginBottom: 20, lineHeight: 1.5 }}>{message}</p>
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-        <button style={S.btn('ghost')} onClick={onCancel}>Cancel</button>
+    <div style={{ ...S.card, padding: 28, maxWidth: 380, width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 20 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+          background: '#fff5f5', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18}}>
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <div>
+          <p style={{fontSize:14,fontWeight:700,color:'#111827',margin:'0 0 4px'}}>Confirm Delete</p>
+          <p style={{fontSize:13,color:'#6b7280',margin:0,lineHeight:1.5}}>{message}</p>
+        </div>
+      </div>
+      <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+        <button style={S.btn('muted')} onClick={onCancel}>Cancel</button>
         <button style={S.btn('danger')} onClick={onConfirm}>Delete</button>
       </div>
     </div>
   </div>
 )
 
-// ─── SubCategory Row ──────────────────────────────────────────────────────────
+// ─── Spinner ───────────────────────────────────────────────────────────────────
+const Spinner = ({ size = 14, color = '#fff' }) => (
+  <span style={{
+    width: size, height: size, flexShrink: 0,
+    border: `2px solid rgba(255,255,255,0.3)`,
+    borderTopColor: color, borderRadius: '50%',
+    display: 'inline-block', animation: 'catSpin 0.7s linear infinite',
+  }} />
+)
+
+// ─── SubCategory Row ───────────────────────────────────────────────────────────
 const SubCategoryRow = ({ sub, categoryId, token, onRefresh }) => {
-  const [editing, setEditing]     = useState(false)
-  const [name, setName]           = useState(sub.name)
-  const [desc, setDesc]           = useState(sub.description || '')
-  const [image, setImage]         = useState(null)
-  const [loading, setLoading]     = useState(false)
-  const [confirm, setConfirm]     = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [name,    setName]    = useState(sub.name)
+  const [desc,    setDesc]    = useState(sub.description || '')
+  const [image,   setImage]   = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [confirm, setConfirm] = useState(false)
 
   const handleUpdate = async () => {
     try {
@@ -167,10 +230,7 @@ const SubCategoryRow = ({ sub, categoryId, token, onRefresh }) => {
       fd.append('name',          name)
       fd.append('description',   desc)
       if (image) fd.append('image', image)
-
-      const { data } = await axios.post(`${backendUrl}/api/category/sub/update`, fd, {
-        headers: { token },
-      })
+      const { data } = await axios.post(`${backendUrl}/api/category/sub/update`, fd, { headers: { token } })
       if (data.success) { toast.success('Sub-category updated'); setEditing(false); onRefresh() }
       else toast.error(data.message)
     } catch { toast.error('Update failed') }
@@ -208,53 +268,63 @@ const SubCategoryRow = ({ sub, categoryId, token, onRefresh }) => {
       />}
 
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        padding: '10px 14px', borderRadius: 8,
-        background: '#060d1a', border: '1px solid #00c2ff11',
-        marginBottom: 6,
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '9px 12px', borderRadius: 8, marginBottom: 6,
+        background: '#fafafa', border: '1px solid #f3f4f6',
+        transition: 'border-color 0.15s', flexWrap: 'wrap',
       }}>
-        {/* Thumb */}
+        {/* Thumbnail */}
         <div style={{
-          width: 36, height: 36, borderRadius: 6, overflow: 'hidden', flexShrink: 0,
-          background: '#0d1a2e', border: '1px solid #00c2ff22',
+          width: 34, height: 34, borderRadius: 6, overflow: 'hidden', flexShrink: 0,
+          background: '#f3f4f6', border: '1px solid #e5e7eb',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          {sub.image
-            ? <img src={sub.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-            : <span style={{ fontSize: 8, color: '#2a4a70' }}>IMG</span>}
+        }}>            {sub.image
+              ? <img src={imgUrl(sub.image)} style={{width:'100%',height:'100%',objectFit:'cover'}} alt="" />
+            : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
+                strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14,color:'#d1d5db'}}>
+                <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+                <path d="M21 15l-5-5L5 21"/>
+              </svg>
+          }
         </div>
 
         {editing ? (
           <>
-            <ImageUpload value={image || sub.image} onChange={setImage} id={`sub-img-${sub._id}`} size={36} />
+            <ImageUpload value={image || sub.image} onChange={setImage} id={`sub-img-${sub._id}`} size={34} />
             <input value={name} onChange={e => setName(e.target.value)}
-              style={{ ...S.inp, flex: 1 }} placeholder="Sub-category name" />
+              style={{...S.inp, flex:1, minWidth:100}} placeholder="Sub-category name"
+              onFocus={focusInp} onBlur={blurInp} />
             <input value={desc} onChange={e => setDesc(e.target.value)}
-              style={{ ...S.inp, flex: 1 }} placeholder="Description (optional)" />
-            <button style={S.btn('success')} onClick={handleUpdate} disabled={loading}>
-              {loading ? '...' : 'Save'}
-            </button>
-            <button style={S.btn('ghost')} onClick={() => setEditing(false)}>
-              <Icon.X />
-            </button>
+              style={{...S.inp, flex:1, minWidth:100}} placeholder="Description (optional)"
+              onFocus={focusInp} onBlur={blurInp} />
+            <div style={{display:'flex',gap:6,flexShrink:0}}>
+              <button style={S.btn('success')} onClick={handleUpdate} disabled={loading}>
+                {loading ? <Spinner color="#16a34a" /> : 'Save'}
+              </button>
+              <button style={S.btn('muted')} onClick={() => setEditing(false)}><Icon.X /></button>
+            </div>
           </>
         ) : (
           <>
-            <div style={{ flex: 1 }}>
-              <span style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 600 }}>{sub.name}</span>
+            <div style={{flex:1, minWidth:80}}>
+              <p style={{fontSize:13,fontWeight:600,color:'#111827',margin:0}}>{sub.name}</p>
               {sub.description && (
-                <span style={{ color: '#4a6fa5', fontSize: 11, marginLeft: 8 }}>{sub.description}</span>
+                <p style={{fontSize:11,color:'#9ca3af',margin:'1px 0 0'}}>{sub.description}</p>
               )}
             </div>
-            <button onClick={handleToggle} title={sub.isActive ? 'Disable' : 'Enable'}>
-              <Icon.Toggle on={sub.isActive} />
-            </button>
-            <button style={S.btn('ghost')} onClick={() => setEditing(true)} title="Edit">
-              <Icon.Edit />
-            </button>
-            <button style={S.btn('danger')} onClick={() => setConfirm(true)} title="Delete">
-              <Icon.Trash />
-            </button>
+            <span style={{
+              fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:99,
+              background: sub.isActive ? '#dbeafe' : '#f3f4f6',
+              color: sub.isActive ? '#2563eb' : '#9ca3af',
+              flexShrink: 0,
+            }}>
+              {sub.isActive ? 'Active' : 'Hidden'}
+            </span>
+            <div style={{display:'flex',gap:6,alignItems:'center',flexShrink:0}}>
+              <ToggleSwitch val={sub.isActive} onToggle={handleToggle} />
+              <button style={S.btn('ghost')} onClick={() => setEditing(true)}><Icon.Edit /></button>
+              <button style={S.btn('danger')} onClick={() => setConfirm(true)}><Icon.Trash /></button>
+            </div>
           </>
         )}
       </div>
@@ -262,7 +332,7 @@ const SubCategoryRow = ({ sub, categoryId, token, onRefresh }) => {
   )
 }
 
-// ─── Add SubCategory Form ─────────────────────────────────────────────────────
+// ─── Add SubCategory Form ──────────────────────────────────────────────────────
 const AddSubForm = ({ categoryId, token, onRefresh, onClose }) => {
   const [name,    setName]    = useState('')
   const [desc,    setDesc]    = useState('')
@@ -278,40 +348,35 @@ const AddSubForm = ({ categoryId, token, onRefresh, onClose }) => {
       fd.append('name',        name.trim())
       fd.append('description', desc.trim())
       if (image) fd.append('image', image)
-
-      const { data } = await axios.post(`${backendUrl}/api/category/sub/add`, fd, {
-        headers: { token },
-      })
-      if (data.success) {
-        toast.success('Sub-category added')
-        onRefresh()
-        onClose()
-      } else toast.error(data.message)
+      const { data } = await axios.post(`${backendUrl}/api/category/sub/add`, fd, { headers: { token } })
+      if (data.success) { toast.success('Sub-category added'); onRefresh(); onClose() }
+      else toast.error(data.message)
     } catch { toast.error('Failed to add sub-category') }
     finally { setLoading(false) }
   }
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: '10px 14px', borderRadius: 8,
-      background: '#00c2ff08', border: '1px dashed #00c2ff33',
-      marginBottom: 8,
+      display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
+      padding:'10px 12px', borderRadius:8, marginBottom:8,
+      background:'#eff6ff', border:'1px dashed #c4b5fd',
     }}>
-      <ImageUpload value={image} onChange={setImage} id={`new-sub-img-${categoryId}`} size={40} />
+      <ImageUpload value={image} onChange={setImage} id={`new-sub-img-${categoryId}`} size={38} />
       <input value={name} onChange={e => setName(e.target.value)} placeholder="Sub-category name *"
-        style={{ ...S.inp, flex: 1 }} autoFocus />
+        style={{...S.inp, flex:1, minWidth:120}} autoFocus onFocus={focusInp} onBlur={blurInp} />
       <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Description (optional)"
-        style={{ ...S.inp, flex: 1 }} />
-      <button style={S.btn('primary')} onClick={handleSubmit} disabled={loading}>
-        {loading ? '...' : 'Add'}
-      </button>
-      <button style={S.btn('ghost')} onClick={onClose}><Icon.X /></button>
+        style={{...S.inp, flex:1, minWidth:120}} onFocus={focusInp} onBlur={blurInp} />
+      <div style={{display:'flex',gap:6,flexShrink:0}}>
+        <button style={S.btn('primary')} onClick={handleSubmit} disabled={loading}>
+          {loading ? <><Spinner /> Adding…</> : <><Icon.Plus /> Add</>}
+        </button>
+        <button style={S.btn('muted')} onClick={onClose}><Icon.X /></button>
+      </div>
     </div>
   )
 }
 
-// ─── Category Card ────────────────────────────────────────────────────────────
+// ─── Category Card ─────────────────────────────────────────────────────────────
 const CategoryCard = ({ cat, token, onRefresh }) => {
   const [open,      setOpen]      = useState(false)
   const [editing,   setEditing]   = useState(false)
@@ -331,10 +396,7 @@ const CategoryCard = ({ cat, token, onRefresh }) => {
       fd.append('name',        name)
       fd.append('description', desc)
       if (image) fd.append('image', image)
-
-      const { data } = await axios.post(`${backendUrl}/api/category/update`, fd, {
-        headers: { token },
-      })
+      const { data } = await axios.post(`${backendUrl}/api/category/update`, fd, { headers: { token } })
       if (data.success) { toast.success('Category updated'); setEditing(false); onRefresh() }
       else toast.error(data.message)
     } catch { toast.error('Update failed') }
@@ -371,106 +433,101 @@ const CategoryCard = ({ cat, token, onRefresh }) => {
       />}
 
       <div style={{ ...S.card, marginBottom: 12, overflow: 'hidden' }}>
-        {/* ── Category header ── */}
+
+        {/* ── Header row ── */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px',
-          cursor: 'pointer', userSelect: 'none',
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '14px 16px', flexWrap: 'wrap',
         }}>
           {/* Thumbnail */}
           <div style={{
-            width: 52, height: 52, borderRadius: 10, overflow: 'hidden', flexShrink: 0,
-            background: '#060d1a', border: '1px solid #00c2ff22',
+            width: 48, height: 48, borderRadius: 10, overflow: 'hidden', flexShrink: 0,
+            background: '#f3f4f6', border: '1px solid #e5e7eb',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             {cat.image
-              ? <img src={cat.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-              : <Icon.Image />}
+              ? <img src={imgUrl(cat.image)} style={{width:'100%',height:'100%',objectFit:'cover'}} alt="" />
+              : <Icon.Image />
+            }
           </div>
 
-          {/* Info */}
-          <div style={{ flex: 1 }} onClick={() => setOpen(o => !o)}>
-            {editing ? null : (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 15 }}>{cat.name}</span>
-                  <span style={{
-                    fontSize: 10, padding: '2px 8px', borderRadius: 20,
-                    background: cat.isActive ? '#00c2ff22' : '#ff4d4d11',
-                    color: cat.isActive ? '#00c2ff' : '#ff6b6b',
-                    fontFamily: "'Courier New', monospace", fontWeight: 700,
-                  }}>
-                    {cat.isActive ? 'ACTIVE' : 'HIDDEN'}
-                  </span>
-                </div>
-                <div style={{ color: '#4a6fa5', fontSize: 12, marginTop: 2 }}>
-                  {subCount} sub-categor{subCount === 1 ? 'y' : 'ies'}
-                  {cat.description && <span> · {cat.description}</span>}
-                </div>
-              </>
-            )}
+          {/* Name + meta */}
+          <div style={{flex:1, minWidth:100, cursor:'pointer'}} onClick={() => !editing && setOpen(o => !o)}>
+            <div style={{display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'}}>
+              <span style={{fontSize:15, fontWeight:700, color:'#111827'}}>{cat.name}</span>
+              <span style={{
+                fontSize:10, fontWeight:700, padding:'2px 9px', borderRadius:99,
+                background: cat.isActive ? '#dbeafe' : '#f3f4f6',
+                color: cat.isActive ? '#2563eb' : '#9ca3af',
+              }}>
+                {cat.isActive ? 'Active' : 'Hidden'}
+              </span>
+            </div>
+            <p style={{fontSize:12, color:'#9ca3af', margin:'2px 0 0'}}>
+              {subCount} sub-categor{subCount === 1 ? 'y' : 'ies'}
+              {cat.description && <span> · {cat.description}</span>}
+            </p>
           </div>
 
           {/* Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={handleToggle} title={cat.isActive ? 'Disable' : 'Enable'}>
-              <Icon.Toggle on={cat.isActive} />
-            </button>
+          <div style={{display:'flex', alignItems:'center', gap:6, flexShrink:0, flexWrap:'wrap'}}>
+            <ToggleSwitch val={cat.isActive} onToggle={handleToggle} />
             <button style={S.btn('ghost')} onClick={() => { setEditing(e => !e); setOpen(true) }}>
               <Icon.Edit />
+              <span className="cat-btn-label">Edit</span>
             </button>
             <button style={S.btn('danger')} onClick={() => setConfirm(true)}>
               <Icon.Trash />
+              <span className="cat-btn-label">Delete</span>
             </button>
-            <button style={{ ...S.btn('ghost'), padding: '8px 10px' }}
-              onClick={() => setOpen(o => !o)}>
+            <button style={S.btn('muted')} onClick={() => setOpen(o => !o)}>
               <Icon.ChevronDown open={open} />
             </button>
           </div>
         </div>
 
-        {/* ── Edit form (inline) ── */}
+        {/* ── Edit inline form ── */}
         {editing && (
           <div style={{
-            padding: '0 16px 14px',
-            borderTop: '1px solid #00c2ff11',
-            paddingTop: 14,
+            padding: '14px 16px', borderTop: '1px solid #f3f4f6',
+            background: '#fafafa', animation: 'catFade 0.2s ease',
           }}>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <div style={{display:'flex', gap:12, alignItems:'flex-end', flexWrap:'wrap'}}>
               <ImageUpload value={image || cat.image} onChange={setImage}
-                id={`cat-img-${cat._id}`} size={64} />
-              <div style={{ flex: 1, display: 'flex', gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={S.label}>Category Name *</label>
-                  <input value={name} onChange={e => setName(e.target.value)} style={S.inp} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={S.label}>Description</label>
-                  <input value={desc} onChange={e => setDesc(e.target.value)} style={S.inp} />
-                </div>
+                id={`cat-img-${cat._id}`} size={60} />
+              <div style={{flex:1, minWidth:140}}>
+                <label style={S.label}>Category Name *</label>
+                <input value={name} onChange={e => setName(e.target.value)}
+                  style={S.inp} onFocus={focusInp} onBlur={blurInp} />
               </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 22 }}>
+              <div style={{flex:1, minWidth:140}}>
+                <label style={S.label}>Description</label>
+                <input value={desc} onChange={e => setDesc(e.target.value)}
+                  style={S.inp} placeholder="Optional" onFocus={focusInp} onBlur={blurInp} />
+              </div>
+              <div style={{display:'flex', gap:8, flexShrink:0}}>
                 <button style={S.btn('success')} onClick={handleUpdate} disabled={loading}>
-                  {loading ? '...' : 'Save'}
+                  {loading ? <><Spinner color="#16a34a" /> Saving…</> : 'Save'}
                 </button>
-                <button style={S.btn('ghost')} onClick={() => setEditing(false)}>
-                  <Icon.X />
-                </button>
+                <button style={S.btn('muted')} onClick={() => setEditing(false)}><Icon.X /></button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── Sub-categories ── */}
+        {/* ── Sub-categories accordion ── */}
         {open && (
-          <div style={{ padding: '0 16px 14px', borderTop: '1px solid #00c2ff11' }}>
+          <div style={{
+            padding: '0 16px 16px', borderTop: '1px solid #f3f4f6',
+            animation: 'catFade 0.2s ease',
+          }}>
             <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              paddingTop: 14, paddingBottom: 10,
+              display:'flex', justifyContent:'space-between', alignItems:'center',
+              paddingTop:14, paddingBottom:12,
             }}>
               <span style={{
-                fontSize: 10, fontWeight: 700, letterSpacing: '0.12em',
-                color: '#2a4a70', fontFamily: "'Courier New', monospace",
-                textTransform: 'uppercase',
+                fontSize:10, fontWeight:700, letterSpacing:'0.1em',
+                textTransform:'uppercase', color:'#9ca3af',
               }}>
                 Sub-Categories ({subCount})
               </span>
@@ -481,30 +538,24 @@ const CategoryCard = ({ cat, token, onRefresh }) => {
 
             {addingSub && (
               <AddSubForm
-                categoryId={cat._id}
-                token={token}
-                onRefresh={onRefresh}
-                onClose={() => setAddingSub(false)}
+                categoryId={cat._id} token={token}
+                onRefresh={onRefresh} onClose={() => setAddingSub(false)}
               />
             )}
 
             {subCount === 0 && !addingSub && (
               <div style={{
-                textAlign: 'center', padding: '20px',
-                color: '#1e3a5f', fontSize: 12,
-                border: '1px dashed #00c2ff11', borderRadius: 8,
+                textAlign:'center', padding:20, color:'#9ca3af', fontSize:13,
+                border:'1px dashed #e5e7eb', borderRadius:10,
               }}>
-                No sub-categories yet. Click "Add Sub" to create one.
+                No sub-categories yet — click "Add Sub" to create one.
               </div>
             )}
 
             {cat.subCategories?.map(sub => (
               <SubCategoryRow
-                key={sub._id}
-                sub={sub}
-                categoryId={cat._id}
-                token={token}
-                onRefresh={onRefresh}
+                key={sub._id} sub={sub}
+                categoryId={cat._id} token={token} onRefresh={onRefresh}
               />
             ))}
           </div>
@@ -514,7 +565,7 @@ const CategoryCard = ({ cat, token, onRefresh }) => {
   )
 }
 
-// ─── Add Category Form ────────────────────────────────────────────────────────
+// ─── Add Category Form ─────────────────────────────────────────────────────────
 const AddCategoryForm = ({ token, onRefresh, onClose }) => {
   const [name,    setName]    = useState('')
   const [desc,    setDesc]    = useState('')
@@ -530,52 +581,42 @@ const AddCategoryForm = ({ token, onRefresh, onClose }) => {
       fd.append('name',        name.trim())
       fd.append('description', desc.trim())
       if (image) fd.append('image', image)
-
-      const { data } = await axios.post(`${backendUrl}/api/category/add`, fd, {
-        headers: { token },
-      })
-      if (data.success) {
-        toast.success('Category created!')
-        onRefresh()
-        onClose()
-      } else toast.error(data.message)
+      const { data } = await axios.post(`${backendUrl}/api/category/add`, fd, { headers: { token } })
+      if (data.success) { toast.success('Category created!'); onRefresh(); onClose() }
+      else toast.error(data.message)
     } catch { toast.error('Failed to create category') }
     finally { setLoading(false) }
   }
 
   return (
-    <div style={{ ...S.card, padding: 20, marginBottom: 24 }}>
+    <div style={{ ...S.card, padding: 20, marginBottom: 20, animation: 'catFade 0.2s ease' }}>
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16,
+        display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16,
       }}>
-        <h3 style={{ color: '#00c2ff', fontWeight: 700, fontSize: 14, margin: 0,
-          fontFamily: "'Courier New', monospace", letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-          New Category
-        </h3>
-        <button style={S.btn('ghost')} onClick={onClose}><Icon.X /></button>
+        <h3 style={{fontSize:14, fontWeight:700, color:'#111827', margin:0}}>New Category</h3>
+        <button style={S.btn('muted')} onClick={onClose}><Icon.X /></button>
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-end' }}>
-          <ImageUpload value={image} onChange={setImage} id="new-cat-img" size={72} />
-          <div style={{ flex: 1 }}>
+        <div style={{display:'flex', gap:12, alignItems:'flex-end', flexWrap:'wrap'}}>
+          <ImageUpload value={image} onChange={setImage} id="new-cat-img" size={68} />
+          <div style={{flex:1, minWidth:140}}>
             <label style={S.label}>Category Name *</label>
             <input value={name} onChange={e => setName(e.target.value)}
-              style={S.inp} placeholder="e.g. Sensors & Modules" autoFocus required />
+              style={S.inp} placeholder="e.g. Sensors & Modules"
+              autoFocus required onFocus={focusInp} onBlur={blurInp} />
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{flex:1, minWidth:140}}>
             <label style={S.label}>Description</label>
             <input value={desc} onChange={e => setDesc(e.target.value)}
-              style={S.inp} placeholder="Short description (optional)" />
+              style={S.inp} placeholder="Short description (optional)"
+              onFocus={focusInp} onBlur={blurInp} />
           </div>
           <button type="submit" style={S.btn('primary')} disabled={loading}>
             {loading
-              ? <><span style={{
-                  width: 14, height: 14, border: '2px solid white',
-                  borderTopColor: 'transparent', borderRadius: '50%',
-                  display: 'inline-block', animation: 'spin 0.7s linear infinite',
-                }} /> Creating...</>
-              : <><Icon.Plus /> Create</>}
+              ? <><Spinner /> Creating…</>
+              : <><Icon.Plus /> Create</>
+            }
           </button>
         </div>
       </form>
@@ -583,7 +624,7 @@ const AddCategoryForm = ({ token, onRefresh, onClose }) => {
   )
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 const Categories = ({ token }) => {
   const [categories, setCategories] = useState([])
   const [loading,    setLoading]    = useState(true)
@@ -593,9 +634,7 @@ const Categories = ({ token }) => {
   const fetchCategories = useCallback(async () => {
     try {
       setLoading(true)
-      const { data } = await axios.get(`${backendUrl}/api/category/list`, {
-        headers: { token },
-      })
+      const { data } = await axios.get(`${backendUrl}/api/category/list`, { headers: { token } })
       if (data.success) setCategories(data.categories)
       else toast.error(data.message)
     } catch { toast.error('Failed to load categories') }
@@ -604,32 +643,29 @@ const Categories = ({ token }) => {
 
   useEffect(() => { fetchCategories() }, [fetchCategories])
 
-  const filtered = categories.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase())
-  )
-
-  const totalSubs = categories.reduce((acc, c) => acc + (c.subCategories?.length || 0), 0)
+  const filtered   = categories.filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
+  const totalSubs  = categories.reduce((acc, c) => acc + (c.subCategories?.length || 0), 0)
+  const activeCount = categories.filter(c => c.isActive).length
 
   return (
-    <div style={{ maxWidth: 860, margin: '0 auto' }}>
+    <div style={{maxWidth: 860, width: '100%'}}>
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes catSpin { to { transform: rotate(360deg); } }
+        @keyframes catFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        .cat-btn-label { display: inline; }
+        @media (max-width: 520px) { .cat-btn-label { display: none; } }
       `}</style>
 
-      {/* ── Header ── */}
+      {/* ── Page header ── */}
       <div style={{
-        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-        marginBottom: 28, flexWrap: 'wrap', gap: 12,
+        display:'flex', alignItems:'flex-start', justifyContent:'space-between',
+        marginBottom:24, flexWrap:'wrap', gap:12,
       }}>
         <div>
-          <h1 style={{
-            color: '#e2e8f0', fontWeight: 800, fontSize: 22, margin: 0,
-            fontFamily: "'Courier New', monospace", letterSpacing: '0.04em',
-          }}>
-            <span style={{ color: '#00c2ff' }}>/ </span>Categories
+          <h1 style={{fontSize:20, fontWeight:700, color:'#111827', letterSpacing:'-0.02em', margin:0}}>
+            Categories
           </h1>
-          <p style={{ color: '#2a4a70', fontSize: 12, marginTop: 4 }}>
+          <p style={{fontSize:13, color:'#9ca3af', marginTop:4}}>
             {categories.length} categories · {totalSubs} sub-categories
           </p>
         </div>
@@ -639,63 +675,70 @@ const Categories = ({ token }) => {
       </div>
 
       {/* ── Stats bar ── */}
-      <div style={{
-        display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap',
-      }}>
+      <div style={{display:'flex', gap:12, marginBottom:20, flexWrap:'wrap'}}>
         {[
-          { label: 'Total Categories',    value: categories.length,                         color: '#00c2ff' },
-          { label: 'Sub-Categories',      value: totalSubs,                                 color: '#00ff95' },
-          { label: 'Active',              value: categories.filter(c => c.isActive).length, color: '#ffd700' },
-          { label: 'Hidden',              value: categories.filter(c => !c.isActive).length,color: '#ff6b6b' },
+          { label: 'Total',       value: categories.length, color: '#2563eb', bg: '#dbeafe' },
+          { label: 'Sub-cats',    value: totalSubs,         color: '#16a34a', bg: '#f0fdf4' },
+          { label: 'Active',      value: activeCount,       color: '#0891b2', bg: '#ecfeff' },
+          { label: 'Hidden',      value: categories.length - activeCount, color: '#dc2626', bg: '#fff5f5' },
         ].map(stat => (
           <div key={stat.label} style={{
-            ...S.card, padding: '12px 18px', flex: '1 1 120px',
-            display: 'flex', flexDirection: 'column', gap: 2,
+            ...S.card, padding:'14px 18px', flex:'1 1 100px',
+            display:'flex', flexDirection:'column', gap:3,
           }}>
-            <span style={{ fontSize: 22, fontWeight: 800, color: stat.color,
-              fontFamily: "'Courier New', monospace" }}>{stat.value}</span>
-            <span style={{ fontSize: 11, color: '#2a4a70', fontFamily: "'Courier New', monospace",
-              textTransform: 'uppercase', letterSpacing: '0.1em' }}>{stat.label}</span>
+            <span style={{fontSize:24, fontWeight:800, color:stat.color, lineHeight:1}}>
+              {stat.value}
+            </span>
+            <span style={{fontSize:11, color:'#9ca3af', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.07em'}}>
+              {stat.label}
+            </span>
           </div>
         ))}
       </div>
 
       {/* ── Add form ── */}
       {adding && (
-        <div style={{ animation: 'fadeIn 0.2s ease' }}>
-          <AddCategoryForm token={token} onRefresh={fetchCategories} onClose={() => setAdding(false)} />
-        </div>
+        <AddCategoryForm token={token} onRefresh={fetchCategories} onClose={() => setAdding(false)} />
       )}
 
       {/* ── Search ── */}
-      <div style={{ marginBottom: 16 }}>
+      <div style={{position:'relative', marginBottom:16}}>
+        <span style={{
+          position:'absolute', left:12, top:'50%',
+          transform:'translateY(-50%)', display:'flex', pointerEvents:'none',
+        }}>
+          <Icon.Search />
+        </span>
         <input
           value={search} onChange={e => setSearch(e.target.value)}
-          style={{ ...S.inp, width: '100%', padding: '10px 14px', fontSize: 13 }}
-          placeholder="🔍  Search categories..."
+          style={{...S.inp, paddingLeft:38}}
+          placeholder="Search categories…"
+          onFocus={focusInp} onBlur={blurInp}
         />
       </div>
 
       {/* ── List ── */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 48 }}>
+        <div style={{textAlign:'center', padding:60}}>
           <div style={{
-            width: 36, height: 36, border: '3px solid #00c2ff44',
-            borderTopColor: '#00c2ff', borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite', margin: '0 auto 12px',
+            width:36, height:36, border:'3px solid #e5e7eb',
+            borderTopColor:'#2563eb', borderRadius:'50%',
+            animation:'catSpin 0.8s linear infinite', margin:'0 auto 12px',
           }} />
-          <p style={{ color: '#2a4a70', fontSize: 13 }}>Loading categories...</p>
+          <p style={{color:'#9ca3af', fontSize:13}}>Loading categories…</p>
         </div>
       ) : filtered.length === 0 ? (
         <div style={{
-          textAlign: 'center', padding: 48, border: '1px dashed #00c2ff22',
-          borderRadius: 12, color: '#2a4a70',
+          textAlign:'center', padding:60, border:'1px dashed #e5e7eb',
+          borderRadius:14, color:'#9ca3af', fontSize:13,
         }}>
-          {search ? `No categories matching "${search}"` : 'No categories yet. Create your first one!'}
+          {search
+            ? `No categories matching "${search}"`
+            : 'No categories yet — create your first one above.'}
         </div>
       ) : (
         filtered.map(cat => (
-          <div key={cat._id} style={{ animation: 'fadeIn 0.2s ease' }}>
+          <div key={cat._id} style={{animation:'catFade 0.2s ease'}}>
             <CategoryCard cat={cat} token={token} onRefresh={fetchCategories} />
           </div>
         ))

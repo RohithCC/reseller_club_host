@@ -20,6 +20,9 @@ import {
 import { toggleWishlist, clearWishlist } from '../app/wishlistSlice'
 import { addToCart } from '../app/cartSlice'
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000'
+const resolveUrl  = (path) => path?.startsWith('http') ? path : `${BACKEND_URL}${path}`
+
 // ─── Selectors ────────────────────────────────────────────────────────────────
 const selectWishlistItems = (s) => s.wishlist.items
 const selectCartItems     = (s) => s.cart.items
@@ -109,7 +112,7 @@ function WishlistCardGrid({ item, inCart, onRemove, onAddToCart, onShare }) {
       <Link to={`/product/${item.id}`} className="block">
         <div className="bg-gray-50 aspect-square flex items-center justify-center p-6 overflow-hidden">
           <img
-            src={image}
+            src={resolveUrl(image)}
             alt={item.name}
             className="max-h-36 max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
             onError={(e) => { e.target.src = 'https://placehold.co/200x200?text=📦' }}
@@ -192,7 +195,7 @@ function WishlistRowList({ item, inCart, onRemove, onAddToCart, onShare }) {
       <Link to={`/product/${item.id}`} className="flex-shrink-0">
         <div className="w-20 h-20 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center overflow-hidden p-2">
           <img
-            src={image}
+            src={resolveUrl(image)}
             alt={item.name}
             className="max-h-full max-w-full object-contain"
             onError={(e) => { e.target.src = 'https://placehold.co/80x80?text=📦' }}

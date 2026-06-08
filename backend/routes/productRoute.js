@@ -22,8 +22,18 @@ import {
 
 const productRouter = express.Router()
 
-// ─── Multer – disk storage for Cloudinary uploads ────────────────────────────
-const storage = multer.diskStorage({ destination: "uploads/" })
+// ─── Multer – local disk storage with unique filenames ──────────────────────
+import { randomUUID } from 'crypto'
+import path from 'path'
+
+const storage = multer.diskStorage({
+  destination: "uploads/",
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.jpg'
+    const uniqueName = `${Date.now()}-${randomUUID().slice(0, 8)}${ext}`
+    cb(null, uniqueName)
+  },
+})
 const upload  = multer({ storage })
 const imgFields = upload.fields([
   { name: "image1", maxCount: 1 },

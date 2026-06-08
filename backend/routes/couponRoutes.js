@@ -8,8 +8,12 @@ import {
   createCoupon,
   updateCoupon,
   deleteCoupon,
+  adminListCoupons,
+  getCouponUsage,
+  bulkGenerateCoupons,
+  getExpiringCoupons,
 } from "../controllers/couponController.js";
-// import { isAuth, isAdmin } from "../middleware/auth.js"; // if you have auth
+import { adminOrSuperAdminAuth } from "../middleware/adminAuth.js";
 
 const router = express.Router();
 
@@ -17,9 +21,13 @@ const router = express.Router();
 router.get("/public", listPublicCoupons);
 router.post("/apply",  applyCoupon);
 
-// Admin — plug your auth middleware in
-router.post("/",        /* isAuth, isAdmin, */ createCoupon);
-router.put("/:id",      /* isAuth, isAdmin, */ updateCoupon);
-router.delete("/:id",   /* isAuth, isAdmin, */ deleteCoupon);
+// Admin (protected)
+router.get("/admin",          adminOrSuperAdminAuth, adminListCoupons);
+router.get("/expiring-soon",  adminOrSuperAdminAuth, getExpiringCoupons);
+router.get("/:id/usage",      adminOrSuperAdminAuth, getCouponUsage);
+router.post("/",              adminOrSuperAdminAuth, createCoupon);
+router.post("/bulk-generate", adminOrSuperAdminAuth, bulkGenerateCoupons);
+router.put("/:id",            adminOrSuperAdminAuth, updateCoupon);
+router.delete("/:id",         adminOrSuperAdminAuth, deleteCoupon);
 
 export default router;

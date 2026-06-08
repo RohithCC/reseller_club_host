@@ -4,11 +4,11 @@
 import DeliveryCharge from "../models/DeliveryCharge.js";
 
 // ── POST /api/delivery/calculate ─────────────────────────────────────
-// Body: { subtotal, weight?, pincode?, method? }
+// Body: { subtotal, weight?, pincode?, state?, method? }
 // Returns the best matching rule + computed charge.
 export const calculateDelivery = async (req, res) => {
   try {
-    const { subtotal, weight = 0, pincode = "", method = "standard" } = req.body;
+    const { subtotal, weight = 0, pincode = "", state = "", method = "standard" } = req.body;
 
     if (typeof subtotal !== "number") {
       return res.status(400).json({ success: false, message: "Cart subtotal is required." });
@@ -24,13 +24,12 @@ export const calculateDelivery = async (req, res) => {
       });
     }
 
-    // Pick first rule whose pincode filter matches (empty list = matches all)
+    // Pick first rule matching by state/region first, then pincode, then fallback
     const matchingRule =
-      rules.find(
-        (r) =>
-          r.applicablePincodes.length === 0 ||
-          (pincode && r.applicablePincodes.includes(pincode))
-      ) || rules[0];
+      rules.find((r) => state && r.applicableRegions.length > 0 && r.applicableRegions.includes(state)) ||
+      rules.find((r) => r.applicablePincodes.length === 0 && r.applicableRegions.length === 0) ||
+      rules.find((r) => r.applicablePincodes.length === 0) ||
+      rules[0];
 
     const computed = matchingRule.computeCharge({ subtotal, weight, pincode });
 
@@ -64,6 +63,16 @@ export const listDeliveryOptions = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// ── GET /api/delivery/admin/all ──────────────────────────────────────
+export const adminListDeliveryCharges = async (req, res) => {
+  try {
+    const options = await DeliveryCharge.find().sort({ priority: 1 }).lean()
+    res.json({ success: true, options })
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message })
+  }
+}
 
 // ── Admin CRUD ───────────────────────────────────────────────────────
 export const createDeliveryCharge = async (req, res) => {

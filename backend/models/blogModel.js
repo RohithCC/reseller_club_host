@@ -37,7 +37,7 @@ const blogSchema = new mongoose.Schema(
       required: true,
     },
     image: {
-      type: String,       // Cloudinary secure_url
+      type: String,       // /uploads/ path
       default: "",
     },
     category: {

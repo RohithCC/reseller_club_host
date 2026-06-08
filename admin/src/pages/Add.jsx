@@ -1,18 +1,143 @@
-// pages/Add.jsx  ─── categories loaded from /api/category/tree
+// pages/Add.jsx
+// TailAdmin-inspired white Add Product page
+// ✅ All logic preserved   ✅ Mobile responsive
+// ✅ Clean white UI        ✅ Section cards layout
+// ✅ Category API loading  ✅ Use cases, specs, tags all intact
+
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { backendUrl } from '../App'
 import { toast } from 'react-toastify'
+import ToggleSwitch from '../components/ToggleSwitch'
 
-// Icon hint options for "What You Can Do" cards
 const ICON_OPTIONS = [
   'Default', 'IoT', 'Arduino', 'Raspberry', 'Robotics',
   'Automation', 'Learning', 'Sensor', 'Prototyping',
 ]
 
+// ── Shared style tokens ────────────────────────────────────────────────────────
+const S = {
+  card: {
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 14,
+    padding: '22px 24px',
+  },
+  label: {
+    display: 'block',
+    fontSize: 12,
+    fontWeight: 600,
+    color: '#374151',
+    marginBottom: 6,
+    letterSpacing: '0.01em',
+  },
+  input: {
+    width: '100%',
+    padding: '9px 12px',
+    fontSize: 13,
+    color: '#111827',
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+    fontFamily: 'inherit',
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: '#111827',
+    marginBottom: 4,
+    letterSpacing: '-0.01em',
+  },
+  sectionSub: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginBottom: 14,
+  },
+  addBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#2563eb',
+    background: '#eff6ff',
+    border: '1px dashed #c4b5fd',
+    borderRadius: 8,
+    padding: '7px 14px',
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+  },
+  removeBtn: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 28, height: 28,
+    border: 'none', background: 'none',
+    color: '#f87171', cursor: 'pointer',
+    borderRadius: 6, fontSize: 18, lineHeight: 1,
+    transition: 'background 0.12s',
+    flexShrink: 0,
+  },
+}
+
+const inputFocus = e => {
+  e.target.style.borderColor = '#2563eb'
+  e.target.style.boxShadow = '0 0 0 3px rgba(79,70,229,0.1)'
+}
+const inputBlur = e => {
+  e.target.style.borderColor = '#e5e7eb'
+  e.target.style.boxShadow = 'none'
+}
+
+// ── Section card wrapper ───────────────────────────────────────────────────────
+const Section = ({ title, sub, badge, children }) => (
+  <div style={S.card}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: sub || badge ? 14 : 18 }}>
+      <div>
+        <p style={S.sectionTitle}>{title}</p>
+        {sub && <p style={S.sectionSub}>{sub}</p>}
+      </div>
+      {badge}
+    </div>
+    {children}
+  </div>
+)
+
+// ── Styled input ───────────────────────────────────────────────────────────────
+const Input = ({ style, ...props }) => (
+  <input
+    style={{ ...S.input, ...style }}
+    onFocus={inputFocus}
+    onBlur={inputBlur}
+    {...props}
+  />
+)
+
+const Select = ({ style, children, ...props }) => (
+  <select
+    style={{ ...S.input, ...style, cursor: 'pointer' }}
+    onFocus={inputFocus}
+    onBlur={inputBlur}
+    {...props}
+  >
+    {children}
+  </select>
+)
+
+const Textarea = ({ style, ...props }) => (
+  <textarea
+    style={{ ...S.input, resize: 'vertical', minHeight: 80, ...style }}
+    onFocus={inputFocus}
+    onBlur={inputBlur}
+    {...props}
+  />
+)
+
+// ═══════════════════════════════════════════════════════════════════════════════
 const Add = ({ token }) => {
 
-  // ── Category/sub state (from API) ──────────────────────────────────────────
   const [categoryTree,  setCategoryTree]  = useState([])
   const [category,      setCategory]      = useState('')
   const [subCategory,   setSubCategory]   = useState('')
@@ -21,6 +146,31 @@ const Add = ({ token }) => {
   const [image2, setImage2] = useState(false)
   const [image3, setImage3] = useState(false)
   const [image4, setImage4] = useState(false)
+
+  const validateImage = (file) => new Promise((resolve) => {
+    if (!file) return resolve(false)
+    const validTypes = ['image/webp', 'image/jpeg']
+    if (!validTypes.includes(file.type)) {
+      toast.error('Only WebP and JPEG formats allowed')
+      return resolve(false)
+    }
+    if (file.size > 204800) {
+      toast.error('File size must be under 200 KB')
+      return resolve(false)
+    }
+    const img = new Image()
+    img.onload = () => {
+      if (img.width !== 1200 || img.height !== 1200) {
+        toast.error(`Image must be exactly 1200×1200px (got ${img.width}×${img.height})`)
+        URL.revokeObjectURL(img.src)
+        return resolve(false)
+      }
+      URL.revokeObjectURL(img.src)
+      resolve(true)
+    }
+    img.onerror = () => { toast.error('Invalid image file'); resolve(false) }
+    img.src = URL.createObjectURL(file)
+  })
 
   const [name,          setName]          = useState('')
   const [description,   setDescription]   = useState('')
@@ -40,16 +190,10 @@ const Add = ({ token }) => {
   const [tags,        setTags]        = useState([''])
   const [specKey,     setSpecKey]     = useState([''])
   const [specVal,     setSpecVal]     = useState([''])
+  const [useCases,    setUseCases]    = useState([{ label: '', desc: '', icon: 'Default' }])
+  const [loading,     setLoading]     = useState(false)
 
-  // ── "What You Can Do" use-case cards ──────────────────────────────────────
-  // Each card: { label, desc, icon }
-  const [useCases, setUseCases] = useState([
-    { label: '', desc: '', icon: 'Default' }
-  ])
-
-  const [loading, setLoading] = useState(false)
-
-  // ── Fetch category tree on mount ───────────────────────────────────────────
+  // ── Fetch category tree ────────────────────────────────────────────────────
   useEffect(() => {
     const fetchTree = async () => {
       try {
@@ -59,16 +203,14 @@ const Add = ({ token }) => {
           setCategory(data.tree[0].name)
           setSubCategory(data.tree[0].subCategories?.[0]?.name || '')
         }
-      } catch {
-        toast.error('Could not load categories.')
-      }
+      } catch { toast.error('Could not load categories.') }
     }
     fetchTree()
   }, [])
 
   const subOptions = categoryTree.find(c => c.name === category)?.subCategories || []
 
-  const handleCategoryChange = (e) => {
+  const handleCategoryChange = e => {
     const cat = e.target.value
     setCategory(cat)
     const subs = categoryTree.find(c => c.name === cat)?.subCategories || []
@@ -78,19 +220,15 @@ const Add = ({ token }) => {
   const discount = originalPrice && price
     ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0
 
-  // ── Generic list helpers ───────────────────────────────────────────────────
+  // ── List helpers ───────────────────────────────────────────────────────────
   const updateList = (setter, list, i, val) => { const n = [...list]; n[i] = val; setter(n) }
-  const addItem    = (setter, list)         => setter([...list, ''])
-  const removeItem = (setter, list, i)      => setter(list.filter((_, idx) => idx !== i))
+  const addItem    = (setter, list)          => setter([...list, ''])
+  const removeItem = (setter, list, i)       => setter(list.filter((_, idx) => idx !== i))
 
-  // ── Use-case helpers ───────────────────────────────────────────────────────
-  const updateUseCase = (i, field, val) => {
+  const updateUseCase  = (i, field, val) =>
     setUseCases(prev => prev.map((uc, idx) => idx === i ? { ...uc, [field]: val } : uc))
-  }
-  const addUseCase = () =>
-    setUseCases(prev => [...prev, { label: '', desc: '', icon: 'Default' }])
-  const removeUseCase = (i) =>
-    setUseCases(prev => prev.filter((_, idx) => idx !== i))
+  const addUseCase     = () => setUseCases(prev => [...prev, { label: '', desc: '', icon: 'Default' }])
+  const removeUseCase  = i  => setUseCases(prev => prev.filter((_, idx) => idx !== i))
 
   // ── Reset ──────────────────────────────────────────────────────────────────
   const resetForm = () => {
@@ -108,7 +246,7 @@ const Add = ({ token }) => {
   }
 
   // ── Submit ─────────────────────────────────────────────────────────────────
-  const onSubmitHandler = async (e) => {
+  const onSubmitHandler = async e => {
     e.preventDefault()
     if (!token) { toast.error('Not authenticated. Please login again.'); return }
     try {
@@ -131,13 +269,10 @@ const Add = ({ token }) => {
 
       const cleanFeatures = keyFeatures.filter(f => f.trim())
       const cleanTags     = tags.filter(t => t.trim()).map(t => t.startsWith('#') ? t : `#${t}`)
-
       const specs = {}
       specKey.forEach((k, i) => {
         if (k.trim() && specVal[i]?.trim()) specs[k.trim()] = specVal[i].trim()
       })
-
-      // Only send use-cases that have at least a label
       const cleanUseCases = useCases.filter(uc => uc.label.trim())
 
       formData.append('keyFeatures',    JSON.stringify(cleanFeatures))
@@ -154,340 +289,452 @@ const Add = ({ token }) => {
       if (response.data.success) { toast.success(response.data.message); resetForm() }
       else toast.error(response.data.message)
     } catch (error) {
-      console.log(error); toast.error(error.message)
+      toast.error(error.message)
     } finally { setLoading(false) }
   }
 
-  const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 bg-white'
-
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <form onSubmit={onSubmitHandler}
-      className='flex flex-col w-full items-start gap-6 p-6 bg-white rounded-xl shadow-sm max-w-4xl'>
+    <>
+      <form onSubmit={onSubmitHandler} style={{ maxWidth: 860, width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      <h2 className='text-xl font-bold text-gray-800'>Add New Product</h2>
-
-      {/* ── Images ── */}
-      <div>
-        <p className='mb-1 font-semibold text-gray-700'>Product Images</p>
-        <p className='text-xs text-gray-400 mb-3'>First image will be the thumbnail shown on listings</p>
-        <div className='flex gap-3 flex-wrap'>
-          {[
-            { img: image1, set: setImage1, id: 'image1', label: 'Main' },
-            { img: image2, set: setImage2, id: 'image2', label: '2nd'  },
-            { img: image3, set: setImage3, id: 'image3', label: '3rd'  },
-            { img: image4, set: setImage4, id: 'image4', label: '4th'  },
-          ].map(({ img, set, id, label }) => (
-            <label key={id} htmlFor={id} className='cursor-pointer group'>
-              <div className={`w-24 h-24 rounded-xl overflow-hidden flex items-center justify-center
-                border-2 border-dashed transition-all
-                ${img ? 'border-blue-400' : 'border-gray-300 group-hover:border-blue-400 bg-gray-50'}`}>
-                {img
-                  ? <img src={URL.createObjectURL(img)} className='w-full h-full object-cover' alt='' />
-                  : <div className='text-center text-gray-400 text-xs p-2'>
-                      <div className='text-2xl mb-1'>+</div><span>{label}</span>
-                    </div>}
-              </div>
-              <input onChange={e => set(e.target.files[0])} type='file' id={id} hidden accept='image/*' />
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Name & Description ── */}
-      <div className='w-full grid gap-4'>
-        <div>
-          <p className='mb-1 font-semibold text-gray-700'>Product Name <span className='text-red-500'>*</span></p>
-          <input value={name} onChange={e => setName(e.target.value)} required
-            className={inp} placeholder='e.g. 10K Thermistor Temperature Sensor Module' />
-        </div>
-        <div>
-          <p className='mb-1 font-semibold text-gray-700'>Description <span className='text-red-500'>*</span></p>
-          <textarea value={description} onChange={e => setDescription(e.target.value)} required rows={3}
-            className={inp + ' resize-none'} placeholder='Detailed product description...' />
-        </div>
-      </div>
-
-      {/* ── Category + Price ── */}
-      <div className='flex flex-wrap gap-4 w-full'>
-
-        {/* Category — from API */}
-        <div className='flex-1 min-w-[170px]'>
-          <p className='mb-1 font-semibold text-gray-700'>Category <span className='text-red-500'>*</span></p>
-          {categoryTree.length === 0
-            ? <div className='text-xs text-gray-400 border border-dashed border-gray-300 rounded-lg px-3 py-2'>
-                Loading categories...
-              </div>
-            : <select value={category} onChange={handleCategoryChange} className={inp}>
-                {categoryTree.map(c => (
-                  <option key={c._id || c.name} value={c.name}>{c.name}</option>
-                ))}
-              </select>
-          }
-        </div>
-
-        {/* Sub-Category — from API */}
-        <div className='flex-1 min-w-[170px]'>
-          <p className='mb-1 font-semibold text-gray-700'>Sub Category <span className='text-red-500'>*</span></p>
-          {subOptions.length === 0
-            ? <div className='text-xs text-amber-500 border border-dashed border-amber-300 rounded-lg px-3 py-2'>
-                No sub-categories — add them in the Categories page
-              </div>
-            : <select value={subCategory} onChange={e => setSubCategory(e.target.value)} className={inp}>
-                {subOptions.map(s => (
-                  <option key={s._id || s.name} value={s.name}>{s.name}</option>
-                ))}
-              </select>
-          }
-        </div>
-
-        <div className='min-w-[130px]'>
-          <p className='mb-1 font-semibold text-gray-700'>MRP ₹</p>
-          <input value={originalPrice} onChange={e => setOriginalPrice(e.target.value)}
-            type='number' min='0' className={inp} placeholder='50' />
-        </div>
-        <div className='min-w-[130px]'>
-          <p className='mb-1 font-semibold text-gray-700'>Sale Price ₹ <span className='text-red-500'>*</span></p>
-          <input value={price} onChange={e => setPrice(e.target.value)}
-            type='number' min='0' required className={inp} placeholder='35' />
-        </div>
-        <div className='min-w-[110px]'>
-          <p className='mb-1 font-semibold text-gray-700'>Stock Qty</p>
-          <input value={stockCount} onChange={e => setStockCount(e.target.value)}
-            type='number' min='0' className={inp} placeholder='100' />
-        </div>
-      </div>
-
-      {discount > 0 && (
-        <div className='flex items-center gap-2 -mt-2'>
-          <span className='bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full'>
-            {discount}% OFF
-          </span>
-          <span className='text-xs text-gray-500'>Discount badge shown on product card</span>
-        </div>
-      )}
-
-      {/* ── Warranty & Returns ── */}
-      <div className='flex flex-wrap gap-4'>
-        <div className='min-w-[190px]'>
-          <p className='mb-1 font-semibold text-gray-700'>Warranty</p>
-          <select value={warranty} onChange={e => setWarranty(e.target.value)} className={inp}>
-            <option>1 Year Warranty</option>
-            <option>6 Months Warranty</option>
-            <option>2 Year Warranty</option>
-            <option>No Warranty</option>
-          </select>
-        </div>
-        <div className='min-w-[190px]'>
-          <p className='mb-1 font-semibold text-gray-700'>Return Policy</p>
-          <select value={returnPolicy} onChange={e => setReturnPolicy(e.target.value)} className={inp}>
-            <option>30-Day Returns</option>
-            <option>7-Day Returns</option>
-            <option>No Returns</option>
-          </select>
-        </div>
-      </div>
-
-      {/* ── Badges ── */}
-      <div>
-        <p className='mb-2 font-semibold text-gray-700'>Product Badges</p>
-        <div className='flex flex-wrap gap-4'>
-          {[
-            { label: '⭐ Bestseller', val: bestseller, set: setBestseller },
-            { label: '🔥 HOT',        val: isHot,      set: setIsHot      },
-            { label: '👁 Popular',    val: isPopular,  set: setIsPopular  },
-            { label: '📌 Featured',   val: isFeatured, set: setIsFeatured },
-            { label: '✅ In Stock',   val: inStock,    set: setInStock    },
-          ].map(({ label, val, set }) => (
-            <label key={label} className='flex items-center gap-2 cursor-pointer select-none'>
-              <div onClick={() => set(p => !p)}
-                className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center px-1
-                  ${val ? 'bg-blue-600' : 'bg-gray-300'}`}>
-                <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform duration-200
-                  ${val ? 'translate-x-5' : 'translate-x-0'}`} />
-              </div>
-              <span className={`text-sm font-medium ${val ? 'text-blue-600' : 'text-gray-500'}`}>{label}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Key Features ── */}
-      <div className='w-full'>
-        <p className='mb-1 font-semibold text-gray-700'>Key Features</p>
-        <p className='text-xs text-gray-400 mb-2'>Bullet points shown on the product page</p>
-        {keyFeatures.map((f, i) => (
-          <div key={i} className='flex gap-2 mb-2'>
-            <input value={f} onChange={e => updateList(setKeyFeatures, keyFeatures, i, e.target.value)}
-              className={inp} placeholder={`Feature ${i+1} — e.g. Working voltage: 3.3V to 5V DC`} />
-            {keyFeatures.length > 1 &&
-              <button type='button' onClick={() => removeItem(setKeyFeatures, keyFeatures, i)}
-                className='text-red-400 hover:text-red-600 px-2 text-xl leading-none'>×</button>}
-          </div>
-        ))}
-        <button type='button' onClick={() => addItem(setKeyFeatures, keyFeatures)}
-          className='text-blue-600 text-sm hover:underline'>+ Add Feature</button>
-      </div>
-
-      {/* ── Specifications ── */}
-      <div className='w-full'>
-        <p className='mb-1 font-semibold text-gray-700'>Specifications</p>
-        <p className='text-xs text-gray-400 mb-2'>Key-value pairs shown in the Specifications tab</p>
-        {specKey.map((k, i) => (
-          <div key={i} className='flex gap-2 mb-2'>
-            <input value={k} onChange={e => updateList(setSpecKey, specKey, i, e.target.value)}
-              className='w-44 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500'
-              placeholder='e.g. Supply Voltage' />
-            <input value={specVal[i] || ''} onChange={e => updateList(setSpecVal, specVal, i, e.target.value)}
-              className='flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500'
-              placeholder='e.g. 3.3V - 5V DC' />
-            {specKey.length > 1 &&
-              <button type='button'
-                onClick={() => { removeItem(setSpecKey, specKey, i); removeItem(setSpecVal, specVal, i) }}
-                className='text-red-400 hover:text-red-600 px-2 text-xl leading-none'>×</button>}
-          </div>
-        ))}
-        <button type='button' onClick={() => { addItem(setSpecKey, specKey); addItem(setSpecVal, specVal) }}
-          className='text-blue-600 text-sm hover:underline'>+ Add Specification</button>
-      </div>
-
-      {/* ── What You Can Do (Use Cases) ────────────────────────────────────── */}
-      <div className='w-full'>
-        <div className='flex items-start justify-between mb-1'>
+        {/* Page header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <p className='font-semibold text-gray-700'>What You Can Do</p>
-            <p className='text-xs text-gray-400 mt-0.5'>
-              Project idea cards shown in the "What You Can Do" tab on the product page.
-              Leave empty to auto-generate from Tags.
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#111827', letterSpacing: '-0.02em', margin: 0 }}>
+              Add New Product
+            </h1>
+            <p style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
+              Fill in the details below to list a new product
             </p>
           </div>
-          {/* Live count badge */}
-          {useCases.filter(uc => uc.label.trim()).length > 0 && (
-            <span className='text-xs bg-blue-100 text-blue-700 font-semibold px-2.5 py-0.5 rounded-full mt-1'>
-              {useCases.filter(uc => uc.label.trim()).length} card{useCases.filter(uc => uc.label.trim()).length !== 1 ? 's' : ''}
-            </span>
-          )}
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 22px', borderRadius: 10,
+              border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+              background: loading ? '#93c5fd' : 'linear-gradient(135deg,#2563eb,#1d4ed8)',
+              color: '#fff', fontSize: 14, fontWeight: 600,
+              boxShadow: loading ? 'none' : '0 4px 14px rgba(79,70,229,0.3)',
+              transition: 'all 0.2s',
+            }}
+          >
+            {loading
+              ? <><span style={{ width:16,height:16,border:'2px solid rgba(255,255,255,0.4)',borderTopColor:'#fff',borderRadius:'50%',display:'inline-block',animation:'addSpin 0.8s linear infinite' }} /> Publishing…</>
+              : <>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:16,height:16}}>
+                    <path d="M12 5v14M5 12h14"/>
+                  </svg>
+                  Add Product
+                </>
+            }
+          </button>
         </div>
 
-        <div className='flex flex-col gap-3 mt-3'>
-          {useCases.map((uc, i) => (
-            <div key={i}
-              className='relative border border-gray-200 rounded-xl p-4 bg-gray-50 hover:border-blue-300 transition-colors'>
+        {/* ── 1. Images ── */}
+        <Section title="Product Images" sub="First image will be used as the listing thumbnail. Recommended: 1200×1200px square, WebP format, &lt;200KB">
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            {[
+              { img: image1, set: setImage1, id: 'image1', label: 'Main' },
+              { img: image2, set: setImage2, id: 'image2', label: '2nd'  },
+              { img: image3, set: setImage3, id: 'image3', label: '3rd'  },
+              { img: image4, set: setImage4, id: 'image4', label: '4th'  },
+            ].map(({ img, set, id, label }) => (
+              <label key={id} htmlFor={id} style={{ cursor: 'pointer' }}>
+                <div style={{
+                  width: 96, height: 96, borderRadius: 12,
+                  border: `2px dashed ${img ? '#2563eb' : '#d1d5db'}`,
+                  overflow: 'hidden',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: img ? '#fff' : '#f9fafb',
+                  transition: 'border-color 0.15s',
+                  position: 'relative',
+                }}>
+                  {img ? (
+                    <img src={URL.createObjectURL(img)} style={{ width:'100%',height:'100%',objectFit:'cover' }} alt="" />
+                  ) : (
+                    <div style={{ textAlign: 'center', color: '#9ca3af' }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{width:24,height:24,margin:'0 auto 4px'}}>
+                        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+                        <path d="M21 15l-5-5L5 21"/>
+                      </svg>
+                      <span style={{ fontSize: 11 }}>{label}</span>
+                    </div>
+                  )}
+                </div>
+                <input onChange={async e => { const f = e.target.files[0]; if (f) { const ok = await validateImage(f); if (ok) set(f); else e.target.value = '' } }} type="file" id={id} hidden accept="image/webp,image/jpeg" />
+              </label>
+            ))}
+          </div>
+          <div style={{ marginTop: 12, padding: '10px 14px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, fontSize: 12, color: '#0369a1' }}>
+            <strong style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Image Requirements</strong>
+            <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 12px', fontSize: 11 }}>
+              <span style={{ fontWeight: 600 }}>Format</span><span>WebP or JPEG</span>
+              <span style={{ fontWeight: 600 }}>Dimensions</span><span>1200 × 1200px (square)</span>
+              <span style={{ fontWeight: 600 }}>File size</span><span>≤ 200 KB</span>
+              <span style={{ fontWeight: 600 }}>Quality</span><span>80% WebP (visually lossless)</span>
+            </div>
+          </div>
+        </Section>
 
-              {/* Card header */}
-              <div className='flex items-center justify-between mb-3'>
-                <span className='text-xs font-bold text-gray-400 uppercase tracking-wider'>
-                  Use Case {i + 1}
-                </span>
-                {useCases.length > 1 && (
-                  <button type='button' onClick={() => removeUseCase(i)}
-                    className='text-red-400 hover:text-red-600 text-lg leading-none w-6 h-6 flex items-center justify-center rounded hover:bg-red-50 transition-colors'>
-                    ×
-                  </button>
-                )}
-              </div>
+        {/* ── 2. Basic Info ── */}
+        <Section title="Basic Information">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <label style={S.label}>Product Name <span style={{color:'#ef4444'}}>*</span></label>
+              <Input value={name} onChange={e => setName(e.target.value)} required
+                placeholder="e.g. 10K Thermistor Temperature Sensor Module" />
+            </div>
+            <div>
+              <label style={S.label}>Description <span style={{color:'#ef4444'}}>*</span></label>
+              <Textarea value={description} onChange={e => setDescription(e.target.value)} required
+                placeholder="Detailed product description..." />
+            </div>
+          </div>
+        </Section>
 
-              <div className='grid grid-cols-1 gap-3'>
+        {/* ── 3. Category + Pricing ── */}
+        <Section title="Category & Pricing">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14 }}>
 
-                {/* Label + Icon row */}
-                <div className='flex gap-2'>
-                  <div className='flex-1'>
-                    <label className='text-xs font-semibold text-gray-500 block mb-1'>
-                      Title / Label <span className='text-red-400'>*</span>
-                    </label>
-                    <input
-                      value={uc.label}
+            {/* Category */}
+            <div>
+              <label style={S.label}>Category <span style={{color:'#ef4444'}}>*</span></label>
+              {categoryTree.length === 0 ? (
+                <div style={{ ...S.input, color: '#9ca3af', background: '#f9fafb', border: '1px dashed #e5e7eb' }}>
+                  Loading…
+                </div>
+              ) : (
+                <Select value={category} onChange={handleCategoryChange}>
+                  {categoryTree.map(c => (
+                    <option key={c._id || c.name} value={c.name}>{c.name}</option>
+                  ))}
+                </Select>
+              )}
+            </div>
+
+            {/* Sub-category */}
+            <div>
+              <label style={S.label}>Sub Category <span style={{color:'#ef4444'}}>*</span></label>
+              {subOptions.length === 0 ? (
+                <div style={{ ...S.input, color: '#d97706', background: '#fffbeb', border: '1px dashed #fcd34d', fontSize: 12 }}>
+                  No sub-categories yet
+                </div>
+              ) : (
+                <Select value={subCategory} onChange={e => setSubCategory(e.target.value)}>
+                  {subOptions.map(s => (
+                    <option key={s._id || s.name} value={s.name}>{s.name}</option>
+                  ))}
+                </Select>
+              )}
+            </div>
+
+            {/* MRP */}
+            <div>
+              <label style={S.label}>MRP ₹</label>
+              <Input value={originalPrice} onChange={e => setOriginalPrice(e.target.value)}
+                type="number" min="0" placeholder="50" />
+            </div>
+
+            {/* Sale price */}
+            <div>
+              <label style={S.label}>Sale Price ₹ <span style={{color:'#ef4444'}}>*</span></label>
+              <Input value={price} onChange={e => setPrice(e.target.value)}
+                type="number" min="0" required placeholder="35" />
+            </div>
+
+            {/* Stock */}
+            <div>
+              <label style={S.label}>Stock Qty</label>
+              <Input value={stockCount} onChange={e => setStockCount(e.target.value)}
+                type="number" min="0" placeholder="100" />
+            </div>
+          </div>
+
+          {/* Discount pill */}
+          {discount > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}>
+              <span style={{
+                background: '#dcfce7', color: '#15803d',
+                fontSize: 12, fontWeight: 700,
+                padding: '3px 10px', borderRadius: 99,
+              }}>{discount}% OFF</span>
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>Discount badge shown on product card</span>
+            </div>
+          )}
+        </Section>
+
+        {/* ── 4. Warranty & Returns ── */}
+        <Section title="Policy">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
+            <div>
+              <label style={S.label}>Warranty</label>
+              <Select value={warranty} onChange={e => setWarranty(e.target.value)}>
+                <option>1 Year Warranty</option>
+                <option>6 Months Warranty</option>
+                <option>2 Year Warranty</option>
+                <option>No Warranty</option>
+              </Select>
+            </div>
+            <div>
+              <label style={S.label}>Return Policy</label>
+              <Select value={returnPolicy} onChange={e => setReturnPolicy(e.target.value)}>
+                <option>30-Day Returns</option>
+                <option>7-Day Returns</option>
+                <option>No Returns</option>
+              </Select>
+            </div>
+          </div>
+        </Section>
+
+        {/* ── 5. Badges ── */}
+        <Section title="Product Badges" sub="Control visibility labels shown on the product card">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+<ToggleSwitch val={bestseller} onToggle={() => setBestseller(p => !p)} label="⭐ Bestseller" />
+                  <ToggleSwitch val={isHot} onToggle={() => setIsHot(p => !p)} label="🔥 HOT" />
+                  <ToggleSwitch val={isPopular} onToggle={() => setIsPopular(p => !p)} label="👁 Popular" />
+                  <ToggleSwitch val={isFeatured} onToggle={() => setIsFeatured(p => !p)} label="📌 Featured" />
+                  <ToggleSwitch val={inStock} onToggle={() => setInStock(p => !p)} label="✅ In Stock" />
+          </div>
+        </Section>
+
+        {/* ── 6. Key Features ── */}
+        <Section title="Key Features" sub="Bullet points shown on the product page">
+          {keyFeatures.map((f, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: '#2563eb', flexShrink: 0, marginTop: 2,
+              }} />
+              <Input value={f} onChange={e => updateList(setKeyFeatures, keyFeatures, i, e.target.value)}
+                placeholder={`Feature ${i + 1} — e.g. Working voltage: 3.3V to 5V DC`}
+                style={{ flex: 1 }} />
+              {keyFeatures.length > 1 && (
+                <button type="button" style={S.removeBtn}
+                  onClick={() => removeItem(setKeyFeatures, keyFeatures, i)}
+                  onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>×</button>
+              )}
+            </div>
+          ))}
+          <button type="button" style={S.addBtn}
+            onClick={() => addItem(setKeyFeatures, keyFeatures)}
+            onMouseEnter={e => e.currentTarget.style.background = '#ede9fe'}
+            onMouseLeave={e => e.currentTarget.style.background = '#eff6ff'}>
+            + Add Feature
+          </button>
+        </Section>
+
+        {/* ── 7. Specifications ── */}
+        <Section title="Specifications" sub="Key-value pairs shown in the Specifications tab">
+          {specKey.map((k, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Input value={k} onChange={e => updateList(setSpecKey, specKey, i, e.target.value)}
+                placeholder="e.g. Supply Voltage" style={{ width: 170, flex: '0 0 170px' }} />
+              <Input value={specVal[i] || ''} onChange={e => updateList(setSpecVal, specVal, i, e.target.value)}
+                placeholder="e.g. 3.3V – 5V DC" style={{ flex: 1, minWidth: 120 }} />
+              {specKey.length > 1 && (
+                <button type="button" style={S.removeBtn}
+                  onClick={() => { removeItem(setSpecKey, specKey, i); removeItem(setSpecVal, specVal, i) }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>×</button>
+              )}
+            </div>
+          ))}
+          <button type="button" style={S.addBtn}
+            onClick={() => { addItem(setSpecKey, specKey); addItem(setSpecVal, specVal) }}
+            onMouseEnter={e => e.currentTarget.style.background = '#ede9fe'}
+            onMouseLeave={e => e.currentTarget.style.background = '#eff6ff'}>
+            + Add Specification
+          </button>
+        </Section>
+
+        {/* ── 8. What You Can Do (Use Cases) ── */}
+        <Section
+          title="What You Can Do"
+          sub="Project idea cards shown in the 'What You Can Do' tab. Leave empty to auto-generate from Tags."
+          badge={
+            useCases.filter(uc => uc.label.trim()).length > 0 ? (
+              <span style={{
+                fontSize: 11, fontWeight: 700,
+                background: '#dbeafe', color: '#2563eb',
+                padding: '3px 10px', borderRadius: 99,
+                whiteSpace: 'nowrap', flexShrink: 0,
+              }}>
+                {useCases.filter(uc => uc.label.trim()).length} card{useCases.filter(uc => uc.label.trim()).length !== 1 ? 's' : ''}
+              </span>
+            ) : null
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {useCases.map((uc, i) => (
+              <div key={i} style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: 12, padding: '16px',
+                background: '#fafafa',
+                transition: 'border-color 0.15s',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    Use Case {i + 1}
+                  </span>
+                  {useCases.length > 1 && (
+                    <button type="button" style={S.removeBtn}
+                      onClick={() => removeUseCase(i)}
+                      onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}>×</button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                  <div style={{ flex: 1, minWidth: 160 }}>
+                    <label style={S.label}>Title / Label <span style={{color:'#ef4444'}}>*</span></label>
+                    <Input value={uc.label}
                       onChange={e => updateUseCase(i, 'label', e.target.value)}
-                      className={inp}
-                      placeholder='e.g. IoT Projects, Home Automation, Arduino'
-                    />
+                      placeholder="e.g. IoT Projects, Home Automation" />
                   </div>
-                  <div className='w-40'>
-                    <label className='text-xs font-semibold text-gray-500 block mb-1'>Icon</label>
-                    <select
-                      value={uc.icon}
-                      onChange={e => updateUseCase(i, 'icon', e.target.value)}
-                      className={inp}>
-                      {ICON_OPTIONS.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
+                  <div style={{ width: 150, flexShrink: 0 }}>
+                    <label style={S.label}>Icon</label>
+                    <Select value={uc.icon} onChange={e => updateUseCase(i, 'icon', e.target.value)}>
+                      {ICON_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </Select>
                   </div>
                 </div>
 
-                {/* Description */}
-                <div>
-                  <label className='text-xs font-semibold text-gray-500 block mb-1'>
-                    Short Description
-                  </label>
-                  <input
-                    value={uc.desc}
+                <div style={{ marginBottom: 10 }}>
+                  <label style={S.label}>Short Description</label>
+                  <Input value={uc.desc}
                     onChange={e => updateUseCase(i, 'desc', e.target.value)}
-                    className={inp}
-                    placeholder='e.g. Build smart sensors and connect devices to your IoT network'
-                  />
+                    placeholder="e.g. Build smart sensors and connect devices to your IoT network" />
                 </div>
 
-                {/* Preview pill */}
+                {/* Preview */}
                 {uc.label.trim() && (
-                  <div className='flex items-center gap-2 mt-1'>
-                    <span className='text-xs text-gray-400'>Preview:</span>
-                    <span className='inline-flex items-center gap-1.5 bg-white border border-blue-200 text-blue-700 text-xs font-semibold px-3 py-1 rounded-full'>
-                      <span>💡</span> {uc.label.trim()}
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, color: '#9ca3af' }}>Preview:</span>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      background: '#dbeafe', border: '1px solid #c7d2fe',
+                      color: '#2563eb', fontSize: 12, fontWeight: 600,
+                      padding: '3px 10px', borderRadius: 99,
+                    }}>💡 {uc.label.trim()}</span>
                     {uc.desc.trim() && (
-                      <span className='text-xs text-gray-500 truncate max-w-xs'>{uc.desc}</span>
+                      <span style={{ fontSize: 12, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>
+                        {uc.desc}
+                      </span>
                     )}
                   </div>
                 )}
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
 
-        <button type='button' onClick={addUseCase}
-          className='mt-3 flex items-center gap-2 text-blue-600 text-sm bg-blue-50
-            border border-dashed border-blue-300 rounded-xl px-4 py-2.5
-            hover:bg-blue-100 transition-colors w-full justify-center'>
-          <span className='text-base leading-none'>+</span> Add Use Case Card
-        </button>
-      </div>
+          <button type="button"
+            onClick={addUseCase}
+            style={{
+              ...S.addBtn,
+              width: '100%', justifyContent: 'center',
+              borderRadius: 10, padding: '10px 16px', marginTop: 12,
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#ede9fe'}
+            onMouseLeave={e => e.currentTarget.style.background = '#eff6ff'}>
+            + Add Use Case Card
+          </button>
+        </Section>
 
-      {/* ── Tags ── */}
-      <div className='w-full'>
-        <p className='mb-1 font-semibold text-gray-700'>Tags</p>
-        <p className='text-xs text-gray-400 mb-2'>
-          Shown as #NTC #Arduino etc. on the product page.
-          Also used to auto-generate "What You Can Do" cards if none are added above.
-        </p>
-        <div className='flex flex-wrap gap-2'>
-          {tags.map((t, i) => (
-            <div key={i} className='flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-3 py-1'>
-              <span className='text-blue-500 text-sm'>#</span>
-              <input value={t.replace(/^#/, '')} onChange={e => updateList(setTags, tags, i, e.target.value)}
-                className='w-20 bg-transparent text-sm outline-none text-blue-700' placeholder='Arduino' />
-              {tags.length > 1 &&
-                <button type='button' onClick={() => removeItem(setTags, tags, i)}
-                  className='text-blue-300 hover:text-red-500 ml-1 text-xs'>×</button>}
-            </div>
-          ))}
-          <button type='button' onClick={() => addItem(setTags, tags)}
-            className='text-blue-600 text-sm bg-blue-50 border border-dashed border-blue-300 rounded-full px-3 py-1 hover:bg-blue-100'>
-            + Tag
+        {/* ── 9. Tags ── */}
+        <Section title="Tags" sub="Shown as #NTC #Arduino etc. Also used to auto-generate 'What You Can Do' cards.">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            {tags.map((t, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                background: '#dbeafe', border: '1px solid #c7d2fe',
+                borderRadius: 99, padding: '5px 12px',
+              }}>
+                <span style={{ color: '#6366f1', fontSize: 13, fontWeight: 700 }}>#</span>
+                <input
+                  value={t.replace(/^#/, '')}
+                  onChange={e => updateList(setTags, tags, i, e.target.value)}
+                  style={{
+                    width: 70, background: 'transparent', border: 'none',
+                    outline: 'none', fontSize: 13, color: '#2563eb', fontWeight: 500,
+                  }}
+                  placeholder="Arduino"
+                />
+                {tags.length > 1 && (
+                  <button type="button"
+                    onClick={() => removeItem(setTags, tags, i)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#93c5fd', fontSize: 15, lineHeight: 1, padding: '0 0 0 2px' }}>
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            <button type="button"
+              onClick={() => addItem(setTags, tags)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                background: '#eff6ff', border: '1px dashed #c4b5fd',
+                borderRadius: 99, padding: '5px 12px',
+                fontSize: 13, fontWeight: 600, color: '#2563eb',
+                cursor: 'pointer', transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#ede9fe'}
+              onMouseLeave={e => e.currentTarget.style.background = '#eff6ff'}>
+              + Tag
+            </button>
+          </div>
+        </Section>
+
+        {/* ── Submit row ── */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, paddingBottom: 32 }}>
+          <button type="button" onClick={resetForm}
+            style={{
+              padding: '10px 20px', borderRadius: 10,
+              border: '1px solid #e5e7eb', background: '#fff',
+              fontSize: 14, fontWeight: 600, color: '#374151',
+              cursor: 'pointer', transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
+            onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+            Reset
+          </button>
+
+          <button type="submit" disabled={loading}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 28px', borderRadius: 10,
+              border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+              background: loading ? '#93c5fd' : 'linear-gradient(135deg,#2563eb,#1d4ed8)',
+              color: '#fff', fontSize: 14, fontWeight: 600,
+              boxShadow: loading ? 'none' : '0 4px 14px rgba(79,70,229,0.3)',
+              transition: 'all 0.2s',
+            }}>
+            {loading
+              ? <><span style={{ width:16,height:16,border:'2px solid rgba(255,255,255,0.4)',borderTopColor:'#fff',borderRadius:'50%',display:'inline-block',animation:'addSpin 0.8s linear infinite' }} /> Publishing…</>
+              : 'Add Product'
+            }
           </button>
         </div>
-      </div>
 
-      {/* ── Submit ── */}
-      <button type='submit' disabled={loading}
-        className='px-10 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800
-          disabled:bg-blue-300 disabled:cursor-not-allowed
-          text-white font-semibold rounded-xl transition-colors flex items-center gap-2'>
-        {loading
-          ? <><span className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' />Adding...</>
-          : 'Add Product'}
-      </button>
+      </form>
 
-    </form>
+      <style>{`
+        @keyframes addSpin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        * { box-sizing: border-box; }
+        input::placeholder,
+        textarea::placeholder { color: #9ca3af; }
+        select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px !important; }
+        @media (max-width: 600px) {
+          form > div:first-child { flex-direction: column; align-items: flex-start; }
+        }
+      `}</style>
+    </>
   )
 }
 

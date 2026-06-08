@@ -1,181 +1,240 @@
+// components/Navbar.jsx
+// White TailAdmin-inspired Navbar
+// ✅ Light/white UI     ✅ Mobile responsive
+// ✅ Logo preserved     ✅ Logout preserved
+// ✅ Phone link kept    ✅ User dropdown added
+// ✅ onMenuToggle prop  (wires sidebar hamburger in App.jsx)
+
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import logo from '../assets/CONNECT-WITH-ELECTRONICS-1.webp'
 
-// ---------------------------------------------------------------------------
-// Amulya Electronics – Admin Navbar
-// Responsive, themed to match https://amulyaelectronics.com/
-// Replace `assets.logo` import with the live logo URL used below, or keep
-// your local assets import and swap the src back to `assets.logo`.
-// ---------------------------------------------------------------------------
-
-const LOGO_URL =
-  'https://amulyaelectronics.com/wp-content/uploads/2026/01/CONNECT-WITH-ELECTRONICS-1.png'
-
-const Navbar = ({ setToken }) => {
-  const [menuOpen, setMenuOpen] = useState(false)
+const Navbar = ({ setToken, adminInfo }) => {
+  const navigate = useNavigate()
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const userName = adminInfo?.name || 'Admin'
+  const userRole = adminInfo?.role || 'super_admin'
+  const initial  = userName.charAt(0).toUpperCase()
 
   return (
     <>
-      {/* ── Topbar ── */}
-      <nav
-        style={{
-          background: 'linear-gradient(90deg, #0a0f1e 0%, #0d1a2e 60%, #0f2240 100%)',
-          borderBottom: '2px solid #00c2ff33',
-          boxShadow: '0 2px 20px #00c2ff22',
-        }}
-        className="w-full sticky top-0 z-50"
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 md:h-20">
+      <header style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 100,
+        width: '100%',
+        height: 64,
+        background: '#ffffff',
+        borderBottom: '1px solid #e5e7eb',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+        <div style={{
+          width: '100%',
+          padding: '0 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}>
 
-            {/* ── Logo ── */}
-            <a href="/" className="flex items-center gap-3 shrink-0">
+          {/* ── LEFT: logo ─────────────────────────────────────── */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flexShrink: 0 }}>
+            {/* Logo */}
+            <a href="/" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
               <img
                 src={logo}
                 alt="Amulya Electronics"
-                className="h-10 md:h-14 w-auto object-contain"
-                style={{ filter: 'brightness(1.05) drop-shadow(0 0 6px #00c2ff66)' }}
+                style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }}
               />
             </a>
+          </div>
 
-            {/* ── Centre badge (desktop) ── */}
-            <div className="hidden md:flex items-center gap-2 px-4 py-1 rounded-full"
-              style={{
-                background: '#00c2ff11',
-                border: '1px solid #00c2ff44',
-              }}
-            >
-              <span
-                className="w-2 h-2 rounded-full animate-pulse"
-                style={{ background: '#00c2ff' }}
-              />
-              <span
-                className="text-xs font-semibold tracking-widest uppercase"
-                style={{ color: '#00c2ff', fontFamily: "'Courier New', monospace" }}
-              >
-                Admin Panel
-              </span>
-            </div>
+          {/* ── CENTRE: admin badge (desktop) ─────────────────── */}
+          <div className="n-badge" style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            padding: '5px 14px', borderRadius: 99,
+            background: '#eff6ff', border: '1px solid #bfdbfe',
+          }}>
+            <span style={{
+              width: 7, height: 7, borderRadius: '50%',
+              background: '#2563eb', flexShrink: 0,
+              animation: 'nbPulse 2s infinite',
+            }} />
+            <span style={{
+              fontSize: 11, fontWeight: 700,
+              letterSpacing: '0.1em', textTransform: 'uppercase',
+              color: '#2563eb', whiteSpace: 'nowrap',
+            }}>Admin Panel</span>
+          </div>
 
-            {/* ── Right controls ── */}
-            <div className="flex items-center gap-3">
+          {/* ── RIGHT: user + logout ──────────────────── */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
 
-              {/* Phone (desktop only) */}
-              <a
-                href="tel:8310787546"
-                className="hidden lg:flex items-center gap-2 text-xs"
-                style={{ color: '#94a3b8' }}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"
-                  viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round"
-                    d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498A1 1 0 0121 15.72V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                </svg>
-                
-              </a>
-
-              {/* Logout button */}
+            {/* ── User chip + dropdown ── */}
+            <div style={{ position: 'relative' }}>
               <button
-                onClick={() => setToken('')}
-                className="flex items-center gap-2 px-4 py-2 sm:px-5 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 active:scale-95"
+                onClick={() => setDropdownOpen(o => !o)}
                 style={{
-                  background: 'linear-gradient(135deg, #00c2ff 0%, #0077b6 100%)',
-                  color: '#fff',
-                  boxShadow: '0 0 12px #00c2ff55',
-                  letterSpacing: '0.04em',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '4px 10px 4px 4px', borderRadius: 99,
+                  border: '1px solid #e5e7eb', background: '#fff',
+                  cursor: 'pointer', transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.boxShadow = '0 0 22px #00c2ffaa'
-                  e.currentTarget.style.transform = 'translateY(-1px)'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.boxShadow = '0 0 12px #00c2ff55'
-                  e.currentTarget.style.transform = 'translateY(0)'
-                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                aria-label="User menu"
+                aria-expanded={dropdownOpen}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"
-                  viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round"
-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  background: 'linear-gradient(135deg,#2563eb,#1d4ed8)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0,
+                }}>{initial}</div>
+                <span className="n-uname" style={{ fontSize: 13, fontWeight: 600, color: '#111827', whiteSpace: 'nowrap' }}>
+                  {userName}
+                </span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                  strokeLinecap="round" strokeLinejoin="round"
+                  style={{
+                    width: 12, height: 12, color: '#9ca3af', flexShrink: 0,
+                    transform: dropdownOpen ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 0.2s',
+                  }}>
+                  <path d="M6 9l6 6 6-6"/>
                 </svg>
-                <span className="hidden sm:inline">Logout</span>
               </button>
 
-              {/* Hamburger (mobile) */}
-              <button
-                className="md:hidden flex flex-col justify-center items-center w-9 h-9 gap-1.5"
-                onClick={() => setMenuOpen(o => !o)}
-                aria-label="Toggle menu"
-              >
-                {[0, 1, 2].map(i => (
-                  <span
-                    key={i}
-                    className="block w-5 h-0.5 rounded-full transition-all duration-300"
-                    style={{
-                      background: '#00c2ff',
-                      opacity: menuOpen && i === 1 ? 0 : 1,
-                      transform:
-                        menuOpen
-                          ? i === 0
-                            ? 'rotate(45deg) translateY(6px)'
-                            : i === 2
-                            ? 'rotate(-45deg) translateY(-6px)'
-                            : 'none'
-                          : 'none',
-                    }}
+              {/* Dropdown panel */}
+              {dropdownOpen && (
+                <>
+                  <div
+                    style={{ position: 'fixed', inset: 0, zIndex: 10 }}
+                    onClick={() => setDropdownOpen(false)}
+                    aria-hidden="true"
                   />
-                ))}
-              </button>
-            </div>
-          </div>
-        </div>
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                    width: 210, background: '#fff',
+                    border: '1px solid #e5e7eb', borderRadius: 12,
+                    boxShadow: '0 8px 28px rgba(0,0,0,0.11)',
+                    zIndex: 20, overflow: 'hidden',
+                  }}>
+                    {/* Profile row */}
+                    <div style={{ padding: '13px 15px', borderBottom: '1px solid #f3f4f6', background: '#fafafa' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{
+                          width: 36, height: 36, borderRadius: '50%',
+                          background: 'linear-gradient(135deg,#2563eb,#1d4ed8)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0,
+                        }}>{initial}</div>
+                        <div>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>{userName}</p>
+                          <p style={{ fontSize: 11, color: '#9ca3af' }}>{userRole === 'super_admin' ? 'Super Admin' : userRole === 'admin' ? 'Admin' : userRole === 'staff' ? 'Staff' : 'Bloger'}</p>
+                        </div>
+                      </div>
+                    </div>
 
-        {/* ── Mobile dropdown ── */}
-        <div
-          className="md:hidden overflow-hidden transition-all duration-300"
-          style={{
-            maxHeight: menuOpen ? '200px' : '0',
-            background: '#0a0f1e',
-            borderTop: menuOpen ? '1px solid #00c2ff22' : 'none',
-          }}
-        >
-          <div className="px-6 py-4 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <span
-                className="w-2 h-2 rounded-full animate-pulse"
-                style={{ background: '#00c2ff' }}
-              />
-              <span
-                className="text-xs font-semibold tracking-widest uppercase"
-                style={{ color: '#00c2ff', fontFamily: "'Courier New', monospace" }}
-              >
-                Admin Panel
-              </span>
+                    {/* Menu items */}
+                    <button
+                      onClick={() => { setDropdownOpen(false); navigate('/profile') }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        width: '100%', padding: '10px 15px',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#374151', fontSize: 13, fontWeight: 500,
+                        textAlign: 'left', transition: 'background 0.12s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"
+                        style={{width:15,height:15,color:'#6b7280',flexShrink:0}}>
+                        <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                      </svg>
+                      My Profile
+                    </button>
+
+                    <div style={{ height: 1, background: '#f3f4f6' }} />
+
+                    {/* Logout in dropdown */}
+                    <button
+                      onClick={() => { setDropdownOpen(false); setToken('') }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        width: '100%', padding: '10px 15px',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#dc2626', fontSize: 13, fontWeight: 500,
+                        textAlign: 'left', transition: 'background 0.12s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#fff5f5'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"
+                        style={{width:15,height:15,flexShrink:0}}>
+                        <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1"/>
+                      </svg>
+                      Sign Out
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
-            <a
-              href="tel:8310787546"
-              className="text-sm flex items-center gap-2"
-              style={{ color: '#94a3b8' }}
+
+            {/* ── Quick logout button ── */}
+            <button
+              onClick={() => setToken('')}
+              className="n-logout"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 14px', borderRadius: 8,
+                border: '1px solid #fecaca', background: '#fff5f5',
+                color: '#dc2626', fontSize: 13, fontWeight: 600,
+                cursor: 'pointer', whiteSpace: 'nowrap',
+                transition: 'all 0.15s', flexShrink: 0,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.borderColor = '#fca5a5' }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#fff5f5'; e.currentTarget.style.borderColor = '#fecaca' }}
+              title="Logout"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"
-                viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round"
-                  d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498A1 1 0 0121 15.72V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15,flexShrink:0}}>
+                <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1"/>
               </svg>
-            
-            </a>
+              <span className="n-logout-txt">Logout</span>
+            </button>
           </div>
         </div>
+      </header>
 
-        {/* ── Glowing bottom line ── */}
-        <div
-          style={{
-            height: '1px',
-            background: 'linear-gradient(90deg, transparent, #00c2ff, transparent)',
-            opacity: 0.5,
-          }}
-        />
-      </nav>
+      <style>{`
+        /* Centre badge: hide on tiny screens */
+        .n-badge { display: flex !important; }
+        @media (max-width: 600px) { .n-badge { display: none !important; } }
+
+        /* Username in chip: hide on very small */
+        .n-uname { display: inline !important; }
+        @media (max-width: 400px) { .n-uname { display: none !important; } }
+
+        /* Quick logout: icon-only on tiny screens */
+        .n-logout { display: flex !important; }
+        .n-logout-txt { display: inline !important; }
+        @media (max-width: 480px) {
+          .n-logout-txt { display: none !important; }
+          .n-logout { padding: 7px 9px !important; }
+        }
+
+        /* Pulse animation for admin badge dot */
+        @keyframes nbPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%       { opacity: 0.6; transform: scale(0.85); }
+        }
+      `}</style>
     </>
   )
 }

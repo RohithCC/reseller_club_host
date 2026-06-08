@@ -12,16 +12,16 @@ import {
     getBlogById
 } from '../controllers/blogController.js'
 import upload from '../middleware/multer.js'
-import { adminAuth } from '../middleware/adminAuth.js'   // ← named import
+import { blogerOrAboveAuth } from '../middleware/adminAuth.js'
 
 const blogRouter = express.Router()
 
 // ── Admin routes (protected) ──────────────────────────────────────────────────
-blogRouter.post('/add',             adminAuth, upload.single('image'), addBlog)
-blogRouter.post('/update',          adminAuth, upload.single('image'), updateBlog)
-blogRouter.post('/remove',          adminAuth, removeBlog)
-blogRouter.post('/toggle-publish',  adminAuth, togglePublish)
-blogRouter.post('/comment/approve', adminAuth, manageComment)
+blogRouter.post('/add',             blogerOrAboveAuth, upload.single('image'), addBlog)
+blogRouter.post('/update',          blogerOrAboveAuth, upload.single('image'), updateBlog)
+blogRouter.post('/remove',          blogerOrAboveAuth, removeBlog)
+blogRouter.post('/toggle-publish',  blogerOrAboveAuth, togglePublish)
+blogRouter.post('/comment/approve', blogerOrAboveAuth, manageComment)
 
 // ── Public routes — fixed routes BEFORE dynamic /:id ─────────────────────────
 blogRouter.get( '/list',         listBlogs)

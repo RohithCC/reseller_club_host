@@ -64,6 +64,17 @@ const couponSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // ── Per-customer usage tracking ──
+    // Array of { userId, email, orderId, usedAt }
+    usedBy: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        email:  { type: String },
+        orderId:{ type: mongoose.Schema.Types.ObjectId, ref: "Order" },
+        usedAt: { type: Date, default: Date.now },
+      },
+    ],
+
     usedCount: {
       type: Number,
       default: 0,

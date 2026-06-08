@@ -1,612 +1,461 @@
-// admin/src/pages/ShowcaseBanners.jsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Admin page for managing homepage showcase banners.
-// Add to your admin sidebar/router as:  /admin/showcase-banners
-//
-// Features:
-//   ✅ List all banners (active + inactive) with live preview thumbnail
-//   ✅ Create new banner via modal (all fields)
-//   ✅ Edit existing banner via modal (pre-filled)
-//   ✅ Delete with confirmation
-//   ✅ Toggle active/inactive per banner
-//   ✅ Drag-to-reorder (↑↓ arrow buttons — no extra library needed)
-//   ✅ Live image URL preview inside modal
-//   ✅ Preset overlay gradient selector
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useEffect, useState, useCallback } from 'react'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import { backendUrl } from '../App'
+import ToggleSwitch from '../components/ToggleSwitch'
 
-// ─── Overlay gradient presets ─────────────────────────────────────────────────
-const OVERLAY_PRESETS = [
-  { label: 'Slate',    value: 'from-slate-900/85 via-slate-900/50 to-transparent'  },
-  { label: 'Blue',     value: 'from-blue-900/85 via-blue-900/50 to-transparent'    },
-  { label: 'Orange',   value: 'from-orange-900/85 via-orange-900/50 to-transparent'},
-  { label: 'Green',    value: 'from-green-900/85 via-green-900/50 to-transparent'  },
-  { label: 'Red',      value: 'from-red-900/85 via-red-900/50 to-transparent'      },
-  { label: 'Violet',   value: 'from-violet-900/85 via-violet-900/50 to-transparent'},
-  { label: 'Indigo',   value: 'from-indigo-900/85 via-indigo-900/50 to-transparent'},
-  { label: 'Rose',     value: 'from-rose-900/85 via-rose-900/50 to-transparent'    },
-  { label: 'Black',    value: 'from-black/90 via-black/60 to-transparent'          },
-]
-
-// ─── Blank form state ─────────────────────────────────────────────────────────
 const EMPTY_FORM = {
-  title:    '',
-  subtitle: '',
-  cta:      'Shop Now',
-  link:     '/collection/',
-  image:    '',
-  overlay:  'from-slate-900/85 via-slate-900/50 to-transparent',
-  order:    0,
-  isActive: true,
+  title: '', description: '',
+  image: '', order: 0, isActive: true,
+  bgColor: 'bg-cyan-100',
+  buttons: [{ label: '', link: '', icon: '' }],
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const inp = "w-full bg-white/[0.04] border border-white/[0.08] hover:border-white/20 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/60 focus:bg-white/[0.06] transition-all"
-const lbl = "block text-[10px] font-black text-white/35 uppercase tracking-[0.1em] mb-1.5"
+const BG_COLORS = [
+  { val: 'bg-white',        label: 'White'      },
+  { val: 'bg-gray-50',      label: 'Gray 50'    },
+  { val: 'bg-slate-100',    label: 'Slate 100'  },
+  { val: 'bg-cyan-100',     label: 'Cyan 100'   },
+  { val: 'bg-blue-50',      label: 'Blue 50'    },
+  { val: 'bg-indigo-50',    label: 'Indigo 50'  },
+  { val: 'bg-amber-50',     label: 'Amber 50'   },
+  { val: 'bg-pink-50',      label: 'Pink 50'    },
+  { val: 'bg-green-50',     label: 'Green 50'   },
+  { val: 'bg-purple-50',    label: 'Purple 50'  },
+  { val: 'bg-orange-50',    label: 'Orange 50'  },
+  { val: 'bg-rose-50',      label: 'Rose 50'    },
+]
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BANNER FORM MODAL (Create + Edit)
-// ─────────────────────────────────────────────────────────────────────────────
-function BannerModal({ banner, token, onClose, onSaved }) {
-  const isEdit = Boolean(banner?._id)
-  const [form, setForm]       = useState(banner ? { ...banner } : { ...EMPTY_FORM })
+const CARD = {
+  background: '#fff', border: '1px solid #e5e7eb',
+  borderRadius: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+}
+
+const ii = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all'
+const ll = 'block text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em] mb-1.5'
+
+function BannerModal({ token, onClose, onSaved }) {
+  const [form, setForm] = useState({ ...EMPTY_FORM })
   const [loading, setLoading] = useState(false)
-  const [imgOk, setImgOk]     = useState(Boolean(banner?.image))
-
+  const [desktopFile, setDesktopFile] = useState(null)
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
+
+  const setBtn = (idx, key, val) =>
+    setForm(f => {
+      const btns = [...(f.buttons || [])]
+      if (!btns[idx]) btns[idx] = { label: '', link: '', icon: '' }
+      btns[idx] = { ...btns[idx], [key]: val }
+      return { ...f, buttons: btns }
+    })
+
+  const validateAndSetImage = (e, setFile, setFormField) => {
+    const f = e.target.files[0]
+    if (!f) return
+
+    if (!['image/webp', 'image/jpeg', 'image/png'].includes(f.type)) {
+      toast.error('Only WebP, JPEG, or PNG allowed.')
+      e.target.value = ''
+      return
+    }
+
+    if (f.size > 200 * 1024) {
+      toast.error('Image must be under 200KB.')
+      e.target.value = ''
+      return
+    }
+
+    const img = new Image()
+    img.onload = () => {
+      if (img.width < 500 || img.height < 500) {
+        toast.error('Image must be at least 500×500px.')
+        e.target.value = ''
+        return
+      }
+      setFile(f)
+      setFormField('image', '')
+      URL.revokeObjectURL(img.src)
+    }
+    img.onerror = () => { toast.error('Failed to load image.'); e.target.value = '' }
+    img.src = URL.createObjectURL(f)
+  }
+
+  const imgSrc = desktopFile
+    ? URL.createObjectURL(desktopFile)
+    : form.image
+      ? (form.image.startsWith('http') ? form.image : backendUrl + form.image)
+      : null
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.title.trim() || !form.subtitle.trim() || !form.link.trim() || !form.image.trim()) {
-      toast.error('Title, subtitle, link and image URL are required.')
+    if (!imgSrc) {
+      toast.error('Desktop image is required.')
       return
     }
     setLoading(true)
     try {
-      const url = isEdit
-        ? `${backendUrl}/api/showcase/admin/banners/${banner._id}`
-        : `${backendUrl}/api/showcase/admin/banners`
+      const url = backendUrl + '/api/showcase/admin/banners'
 
-      const { data } = isEdit
-        ? await axios.put(url, form, { headers: { token } })
-        : await axios.post(url, form, { headers: { token } })
+      let payload
+      let headers = { token }
+      if (desktopFile) {
+        const fd = new FormData()
+        fd.append('title', form.title.trim() || 'Banner')
+        fd.append('description', form.description?.trim() || '')
+        fd.append('buttons', JSON.stringify(form.buttons || []))
+        fd.append('bgColor', form.bgColor || 'bg-white')
+        fd.append('order', Number(form.order) || 0)
+        fd.append('isActive', Boolean(form.isActive))
+        fd.append('image', desktopFile)
+        payload = fd
+        headers = { token, 'Content-Type': 'multipart/form-data' }
+      } else {
+        payload = {
+          title: form.title.trim() || 'Banner',
+          description: form.description?.trim() || '',
+          buttons: form.buttons || [],
+          bgColor: form.bgColor || 'bg-white',
+          image: form.image.startsWith('http') ? form.image : (form.image || ''),
+          order: Number(form.order) || 0,
+          isActive: Boolean(form.isActive),
+        }
+      }
 
+      const { data } = await axios.post(url, payload, { headers })
       if (data.success) {
-        toast.success(isEdit ? 'Banner updated!' : 'Banner created!')
+        toast.success('Banner created!')
         onSaved(data.banner)
         onClose()
-      } else {
-        toast.error(data.message)
-      }
+      } else toast.error(data.message)
     } catch (err) {
       toast.error(err.response?.data?.message || err.message)
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   return (
-    <div className="fixed inset-0 z-[300] bg-black/75 backdrop-blur-md flex items-center justify-center px-4 py-6">
-      <div className="relative bg-[#080f1a] border border-white/[0.08] rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center px-4 py-6" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[94vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="h-1 rounded-t-2xl" style={{ background: 'linear-gradient(90deg, #2563eb, #1d4ed8)' }} />
+        <div className="flex gap-0 min-h-[500px]">
 
-        {/* Top accent line */}
-        <div className="h-0.5 rounded-t-3xl" style={{ background: 'linear-gradient(90deg, transparent, #22d3ee, transparent)' }} />
-
-        <div className="p-6">
-          {/* Header */}
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h2 className="text-lg font-black text-white tracking-tight">
-                {isEdit ? '✏️ Edit Banner' : '✨ New Banner'}
-              </h2>
-              <p className="text-xs text-white/30 mt-0.5">
-                {isEdit ? `Editing: ${banner.title}` : 'Add a new showcase banner to the homepage'}
-              </p>
+          {/* ── LEFT: FORM ────────────────────────── */}
+          <div className="flex-1 p-6 pb-4">
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">New CTA Banner</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Configure the storefront CTA section</p>
+              </div>
+              <button onClick={onClose} className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-400 hover:text-gray-600 flex items-center justify-center text-sm">X</button>
             </div>
-            <button onClick={onClose}
-              className="w-8 h-8 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-white/40 hover:text-white flex items-center justify-center transition-all">
-              ✕
-            </button>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+
+              {/* Title */}
+              <div>
+                <label className={ll}>Title *</label>
+                <input type="text" placeholder="Get the Amulya App" value={form.title} onChange={e => set('title', e.target.value)} className={ii} maxLength={120} />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className={ll}>Description</label>
+                <textarea placeholder="Download our app for exclusive deals, faster checkout, and order tracking on the go."
+                  value={form.description} onChange={e => set('description', e.target.value)}
+                  className={`${ii} min-h-[72px] resize-none`} maxLength={500} rows={3} />
+              </div>
+
+              {/* Background Color */}
+              <div>
+                <label className={ll}>Background Color</label>
+                <div className="flex flex-wrap gap-2">
+                  {BG_COLORS.map(c => (
+                    <button key={c.val} type="button" onClick={() => set('bgColor', c.val)}
+                      className={`w-8 h-8 rounded-lg border-2 transition-all ${c.val} ${form.bgColor === c.val ? 'border-blue-500 ring-2 ring-blue-200 scale-110' : 'border-gray-200 hover:border-gray-300'}`}
+                      title={c.label} />
+                  ))}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">{BG_COLORS.find(c => c.val === form.bgColor)?.label || form.bgColor}</p>
+              </div>
+
+              {/* CTA Button */}
+              <div>
+                <label className={ll}>CTA Button</label>
+                <div className="flex gap-2">
+                  <input type="text"
+                    placeholder="Shop Now"
+                    value={form.buttons?.[0]?.label || ''}
+                    onChange={e => setBtn(0, 'label', e.target.value)}
+                    className={`${ii} flex-[3]`} maxLength={40} />
+                  <input type="text"
+                    placeholder="/collection/category"
+                    value={form.buttons?.[0]?.link || ''}
+                    onChange={e => setBtn(0, 'link', e.target.value)}
+                    className={`${ii} flex-[5]`} />
+                </div>
+              </div>
+
+              {/* Image upload */}
+              <div>
+                <label className={ll}>Image *</label>
+                <label className="block cursor-pointer">
+                  <div className="flex items-center gap-3 p-3 border-2 border-dashed border-gray-200 rounded-xl hover:border-blue-300 transition-colors bg-gray-50/50">
+                    {imgSrc ? (
+                      <div className="relative w-16 h-12 rounded-lg overflow-hidden shrink-0 bg-gray-100">
+                        <img src={imgSrc} alt="" className="w-full h-full object-cover"
+                          onError={e => { e.target.style.display = 'none' }} />
+                      </div>
+                    ) : (
+                      <div className="w-16 h-12 rounded-lg shrink-0 bg-gray-100 flex items-center justify-center text-gray-300 text-lg">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{width:22,height:22}}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-700">{desktopFile ? desktopFile.name : 'Click to upload'}</p>
+                      <p className="text-[10px] text-gray-400">{desktopFile ? (desktopFile.size / 1024).toFixed(0) + ' KB' : 'WebP · 500×500px · Max 200KB'}</p>
+                    </div>
+                    {desktopFile && (
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setDesktopFile(null) }}
+                        className="text-red-400 hover:text-red-500 text-sm font-bold shrink-0">X</button>
+                    )}
+                  </div>
+                  <input type="file" accept="image/webp,image/jpeg,image/png" className="hidden" onChange={e => { validateAndSetImage(e, setDesktopFile, set) }} />
+                </label>
+              </div>
+
+              {/* Active toggle */}
+              <div className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-blue-600">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">Show on site</p>
+                    <p className="text-[11px] text-gray-400">Visitors see active banners only</p>
+                  </div>
+                </div>
+                <ToggleSwitch val={form.isActive} onToggle={() => set('isActive', !form.isActive)} />
+              </div>
+
+              {/* Submit */}
+              <div className="flex gap-3 pt-2 border-t border-gray-100">
+                <button type="button" onClick={onClose} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 py-3 rounded-xl text-sm font-bold">Cancel</button>
+                <button type="submit" disabled={loading}
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 disabled:opacity-40 text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-blue-600/20">
+                  {loading ? 'Creating...' : 'Create Banner'}
+                </button>
+              </div>
+            </form>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          {/* ── RIGHT: LIVE PREVIEW ────────────────── */}
+          <div className="w-[360px] shrink-0 bg-gray-50 border-l border-gray-200 p-6 hidden lg:block">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em] mb-4">Preview</p>
 
-            {/* Two-column: form left, preview right */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
-              {/* ── Left: form fields ── */}
-              <div className="space-y-4">
-
-                <div>
-                  <label className={lbl}>Banner Title *</label>
-                  <input type="text" placeholder="Motors & Motor Drivers"
-                    value={form.title} onChange={e => set('title', e.target.value)}
-                    className={inp} maxLength={120} required />
-                  <p className="text-[9px] text-white/20 mt-1 text-right">{form.title.length}/120</p>
-                </div>
-
-                <div>
-                  <label className={lbl}>Subtitle *</label>
-                  <textarea rows={3} placeholder="DC, Geared, Servo motors + L298N drivers…"
-                    value={form.subtitle} onChange={e => set('subtitle', e.target.value)}
-                    className={inp + ' resize-none'} maxLength={300} required />
-                  <p className="text-[9px] text-white/20 mt-1 text-right">{form.subtitle.length}/300</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={lbl}>CTA Button Text</label>
-                    <input type="text" placeholder="Shop Now"
-                      value={form.cta} onChange={e => set('cta', e.target.value)}
-                      className={inp} maxLength={40} />
-                  </div>
-                  <div>
-                    <label className={lbl}>Display Order</label>
-                    <input type="number" min={0} step={1}
-                      value={form.order} onChange={e => set('order', Number(e.target.value))}
-                      className={inp} />
-                  </div>
-                </div>
-
-                <div>
-                  <label className={lbl}>Collection / Page Link *</label>
-                  <input type="text" placeholder="/collection/Motor"
-                    value={form.link} onChange={e => set('link', e.target.value)}
-                    className={inp} required />
-                  <p className="text-[9px] text-white/20 mt-1">
-                    e.g. /collection/Sensors%20%26%20Modules · /products · /deals
-                  </p>
-                </div>
-
-                {/* Active toggle */}
-                <div className="flex items-center justify-between bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3">
-                  <div>
-                    <p className="text-xs font-bold text-white/80">Show on homepage</p>
-                    <p className="text-[10px] text-white/30 mt-0.5">Inactive banners are hidden from visitors</p>
-                  </div>
-                  <button type="button"
-                    onClick={() => set('isActive', !form.isActive)}
-                    className={`relative w-12 h-6 rounded-full transition-all duration-300 ${form.isActive ? 'bg-cyan-500' : 'bg-white/10'}`}>
-                    <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all duration-300 ${form.isActive ? 'left-7' : 'left-1'}`} />
-                  </button>
-                </div>
-              </div>
-
-              {/* ── Right: image + overlay ── */}
-              <div className="space-y-4">
-
-                {/* Image URL input */}
-                <div>
-                  <label className={lbl}>Image URL *</label>
-                  <input type="url" placeholder="https://…/banner.jpg"
-                    value={form.image}
-                    onChange={e => { set('image', e.target.value); setImgOk(false) }}
-                    className={inp} required />
-                  <p className="text-[9px] text-white/20 mt-1">Recommended: 1400×440px · JPG or WebP</p>
-                </div>
-
-                {/* Live preview */}
-                <div className="relative rounded-2xl overflow-hidden h-36 bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
-                  {form.image ? (
-                    <>
-                      <img
-                        src={form.image}
-                        alt="Preview"
-                        onLoad={() => setImgOk(true)}
-                        onError={() => setImgOk(false)}
-                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${imgOk ? 'opacity-100' : 'opacity-0'}`}
-                      />
-                      <div className={`absolute inset-0 bg-gradient-to-r ${form.overlay}`} />
-                      <div className="absolute bottom-2 left-3 right-3 z-10">
-                        <p className="text-white font-black text-sm leading-snug line-clamp-1 drop-shadow-lg">{form.title || 'Banner Title'}</p>
-                        <p className="text-white/70 text-[10px] mt-0.5 line-clamp-1">{form.subtitle || 'Subtitle preview'}</p>
-                      </div>
-                      {!imgOk && (
-                        <p className="text-white/20 text-xs z-10">Loading preview…</p>
+            <div className={`rounded-xl overflow-hidden border border-gray-200 ${form.bgColor}`}>
+                <div className="grid grid-cols-5 gap-0 min-h-[200px]">
+                  <div className="col-span-3 flex flex-col justify-center p-5">
+                    <h3 className="text-sm font-black text-gray-900 mb-1 leading-tight">
+                      {form.title || 'Get the Amulya App'}
+                    </h3>
+                    <p className="text-[10px] text-gray-500 mb-3 leading-relaxed line-clamp-3">
+                      {form.description || 'Download our app for exclusive deals and faster checkout.'}
+                    </p>
+                    <div className="flex gap-2">
+                      {form.buttons?.[0]?.label ? (
+                        <div className="flex items-center gap-1 text-[9px] font-bold bg-gray-900 text-white px-2.5 py-1.5 rounded-lg">
+                          <span className="truncate max-w-[80px]">{form.buttons[0].label}</span>
+                        </div>
+                      ) : (
+                        <div className="text-[9px] text-gray-400 italic">Add button</div>
                       )}
-                    </>
-                  ) : (
-                    <p className="text-white/20 text-xs">Enter an image URL to preview</p>
-                  )}
-                </div>
-
-                {/* Overlay gradient selector */}
-                <div>
-                  <label className={lbl}>Overlay Gradient</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {OVERLAY_PRESETS.map(p => (
-                      <button type="button" key={p.value}
-                        onClick={() => set('overlay', p.value)}
-                        className={`py-2 px-2 rounded-xl border text-[10px] font-bold transition-all ${
-                          form.overlay === p.value
-                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                            : 'bg-white/[0.03] border-white/[0.06] text-white/35 hover:text-white/60 hover:border-white/15'
-                        }`}>
-                        {p.label}
-                      </button>
-                    ))}
-                    {/* Custom */}
-                    <div className="col-span-3">
-                      <input type="text" placeholder="or type custom Tailwind gradient classes…"
-                        value={OVERLAY_PRESETS.some(p => p.value === form.overlay) ? '' : form.overlay}
-                        onChange={e => set('overlay', e.target.value)}
-                        className={inp + ' text-[11px]'} />
                     </div>
                   </div>
+                  <div className="col-span-2 flex items-end justify-center relative">
+                    {imgSrc ? (
+                      <img src={imgSrc} alt="" className="max-h-[160px] object-contain" />
+                    ) : (
+                      <div className="w-full h-full min-h-[120px] bg-gray-200 rounded-tl-xl flex items-center justify-center text-[9px] text-gray-400">Image</div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Actions */}
-            <div className="flex gap-3 pt-2 border-t border-white/[0.05]">
-              <button type="button" onClick={onClose}
-                className="flex-1 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white/50 hover:text-white py-3 rounded-xl text-sm font-bold transition-all">
-                Cancel
-              </button>
-              <button type="submit" disabled={loading}
-                className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-40 text-white py-3 rounded-xl text-sm font-black transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2">
-                {loading
-                  ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />{isEdit ? 'Saving…' : 'Creating…'}</>
-                  : isEdit ? '→ Save Changes' : '→ Create Banner'}
-              </button>
-            </div>
-          </form>
+            {!form.isActive && (
+              <div className="mt-2 text-center text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-lg py-1.5">Hidden — not visible to visitors</div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DELETE CONFIRMATION MODAL
-// ─────────────────────────────────────────────────────────────────────────────
 function DeleteModal({ banner, token, onClose, onDeleted }) {
   const [loading, setLoading] = useState(false)
-
   const handleDelete = async () => {
     setLoading(true)
     try {
-      const { data } = await axios.delete(
-        `${backendUrl}/api/showcase/admin/banners/${banner._id}`,
-        { headers: { token } }
-      )
-      if (data.success) {
-        toast.success('Banner deleted')
-        onDeleted(banner._id)
-        onClose()
-      } else {
-        toast.error(data.message)
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || err.message)
-    } finally {
-      setLoading(false)
-    }
+      const { data } = await axios.delete(backendUrl + '/api/showcase/admin/banners/' + banner._id, { headers: { token } })
+      if (data.success) { toast.success('Deleted'); onDeleted(banner._id); onClose() }
+      else toast.error(data.message)
+    } catch (err) { toast.error(err.response?.data?.message || err.message) }
+    finally { setLoading(false) }
   }
-
   return (
-    <div className="fixed inset-0 z-[300] bg-black/75 backdrop-blur-md flex items-center justify-center px-4">
-      <div className="bg-[#080f1a] border border-red-500/20 rounded-3xl shadow-2xl w-full max-w-sm p-6">
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
         <div className="text-center mb-5">
-          <div className="w-14 h-14 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">🗑️</div>
-          <h2 className="text-lg font-black text-white">Delete Banner?</h2>
-          <p className="text-xs text-white/40 mt-2 leading-relaxed">
-            "<span className="text-white/60 font-bold">{banner.title}</span>" will be permanently removed from the homepage.
-          </p>
+          <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">X</div>
+          <h2 className="text-lg font-bold text-gray-900">Delete Banner?</h2>
+          <p className="text-xs text-gray-500 mt-2">"<span className="font-bold">{banner.title}</span>" will be removed permanently.</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={onClose}
-            className="flex-1 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white/50 hover:text-white py-3 rounded-xl text-sm font-bold transition-all">
-            Cancel
-          </button>
+          <button onClick={onClose} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 py-3 rounded-xl text-sm font-bold">Cancel</button>
           <button onClick={handleDelete} disabled={loading}
-            className="flex-1 bg-red-500 hover:bg-red-400 disabled:opacity-50 text-white py-3 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2">
-            {loading
-              ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Deleting…</>
-              : '🗑️ Delete'}
-          </button>
+            className="flex-1 bg-red-500 hover:bg-red-400 disabled:opacity-50 text-white py-3 rounded-xl text-sm font-bold">{loading ? 'Deleting...' : 'Delete'}</button>
         </div>
       </div>
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BANNER ROW CARD
-// ─────────────────────────────────────────────────────────────────────────────
-function BannerCard({ banner, index, total, token, onEdit, onDelete, onToggle, onMove }) {
+function BannerCard({ banner, index, total, token, onDelete, onToggle, onMove }) {
   const [toggling, setToggling] = useState(false)
-
   const handleToggle = async () => {
     setToggling(true)
     try {
-      const { data } = await axios.put(
-        `${backendUrl}/api/showcase/admin/banners/${banner._id}/toggle`,
-        {},
-        { headers: { token } }
-      )
-      if (data.success) {
-        toast.success(data.message)
-        onToggle(data.banner)
-      } else {
-        toast.error(data.message)
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || err.message)
-    } finally {
-      setToggling(false)
-    }
+      const { data } = await axios.put(backendUrl + '/api/showcase/admin/banners/' + banner._id + '/toggle', {}, { headers: { token } })
+      if (data.success) { toast.success(data.message); onToggle(data.banner) }
+      else toast.error(data.message)
+    } catch (err) { toast.error(err.response?.data?.message || err.message) }
+    finally { setToggling(false) }
   }
+  const st = banner.isActive ? { bg: '#f0fdf4', text: '#16a34a', dot: '#22c55e', border: '#bbf7d0', label: 'Active' }
+    : { bg: '#f3f4f6', text: '#9ca3af', dot: '#d1d5db', border: '#e5e7eb', label: 'Hidden' }
+
+  const hasButtons = Array.isArray(banner.buttons) && banner.buttons.some(b => b.label)
 
   return (
-    <div className={`relative bg-white/[0.03] border rounded-2xl overflow-hidden transition-all duration-200 ${
-      banner.isActive ? 'border-white/[0.08] hover:border-white/15' : 'border-white/[0.04] opacity-60'
-    }`}>
-      {/* Status stripe */}
-      <div className={`absolute top-0 left-0 w-1 h-full rounded-l-2xl ${banner.isActive ? 'bg-cyan-500' : 'bg-white/10'}`} />
-
+    <div style={{ ...CARD, overflow: 'hidden', opacity: !banner.isActive ? 0.6 : 1 }}>
+      <div className="absolute top-0 left-0 w-1 h-full rounded-l-[14px]" style={{ background: st.dot }} />
       <div className="flex items-center gap-4 p-4 pl-5">
-
-        {/* Order controls */}
-        <div className="flex flex-col gap-1 flex-shrink-0">
-          <button onClick={() => onMove(index, index - 1)} disabled={index === 0}
-            className="w-6 h-6 rounded-lg bg-white/[0.05] hover:bg-white/[0.12] disabled:opacity-20 text-white/50 hover:text-white text-xs flex items-center justify-center transition-all">
-            ↑
-          </button>
-          <span className="text-[9px] text-white/20 font-mono text-center">{index + 1}</span>
-          <button onClick={() => onMove(index, index + 1)} disabled={index === total - 1}
-            className="w-6 h-6 rounded-lg bg-white/[0.05] hover:bg-white/[0.12] disabled:opacity-20 text-white/50 hover:text-white text-xs flex items-center justify-center transition-all">
-            ↓
-          </button>
+        <div className="flex flex-col gap-1 shrink-0">
+          <button onClick={() => onMove(index, index - 1)} disabled={index === 0} className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-20 text-gray-500 text-xs">^</button>
+          <span className="text-[9px] text-gray-300 font-mono text-center">{index + 1}</span>
+          <button onClick={() => onMove(index, index + 1)} disabled={index === total - 1} className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-20 text-gray-500 text-xs">v</button>
         </div>
-
-        {/* Thumbnail */}
-        <div className="relative w-24 h-16 rounded-xl overflow-hidden bg-white/[0.04] border border-white/[0.06] flex-shrink-0">
-          <img src={banner.image} alt={banner.title}
-            className="absolute inset-0 w-full h-full object-cover"
-            onError={e => { e.target.src = 'https://placehold.co/96x64?text=📷' }} />
-          <div className={`absolute inset-0 bg-gradient-to-r ${banner.overlay} opacity-60`} />
+        <div className="relative w-24 h-16 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
+          <img src={banner.image} alt={banner.title} className="absolute inset-0 w-full h-full object-cover" onError={e => { e.target.style.display = 'none' }} />
         </div>
-
-        {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start gap-2 flex-wrap">
-            <p className="text-sm font-black text-white/90 truncate">{banner.title}</p>
-            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border flex-shrink-0 ${
-              banner.isActive
-                ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/25'
-                : 'bg-white/[0.05] text-white/25 border-white/[0.08]'
-            }`}>
-              {banner.isActive ? 'Active' : 'Hidden'}
+            <p className="text-sm font-bold text-gray-900 truncate">{banner.title}</p>
+            {banner.bgColor && banner.bgColor !== 'bg-white' && (
+              <span className={`inline-block w-3 h-3 rounded ${banner.bgColor} border border-gray-300 shrink-0 mt-0.5`} title={banner.bgColor} />
+            )}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, border: '1px solid ' + st.border, background: st.bg, color: st.text, flexShrink: 0 }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: st.dot, display: 'inline-block' }} />{st.label}
             </span>
           </div>
-          <p className="text-[11px] text-white/35 mt-0.5 line-clamp-1">{banner.subtitle}</p>
+          {hasButtons ? (
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span className="text-[9px] font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{banner.buttons[0].label}</span>
+            </div>
+          ) : null}
           <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-            <span className="text-[10px] text-cyan-400/70 font-mono bg-cyan-500/[0.08] border border-cyan-500/15 px-2 py-0.5 rounded-lg">
-              {banner.link}
-            </span>
-            <span className="text-[10px] text-white/20 font-bold">CTA: "{banner.cta}"</span>
+            <span className="text-[10px] text-blue-600 font-mono bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">{banner.buttons?.[0]?.link || '—'}</span>
           </div>
         </div>
-
-        {/* Action buttons */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Toggle */}
-          <button onClick={handleToggle} disabled={toggling} title={banner.isActive ? 'Deactivate' : 'Activate'}
-            className={`relative w-10 h-5 rounded-full transition-all duration-300 ${banner.isActive ? 'bg-cyan-500' : 'bg-white/10'} ${toggling ? 'opacity-50' : ''}`}>
-            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300 ${banner.isActive ? 'left-5' : 'left-0.5'}`} />
-          </button>
-
-          <button onClick={() => onEdit(banner)}
-            className="text-[10px] font-black bg-white/[0.05] hover:bg-cyan-500/20 text-white/50 hover:text-cyan-300 border border-white/[0.08] hover:border-cyan-500/30 px-3 py-1.5 rounded-xl transition-all">
-            Edit
-          </button>
-          <button onClick={() => onDelete(banner)}
-            className="text-[10px] font-black bg-white/[0.05] hover:bg-red-500/20 text-white/50 hover:text-red-400 border border-white/[0.08] hover:border-red-500/30 px-3 py-1.5 rounded-xl transition-all">
-            Delete
-          </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <ToggleSwitch val={banner.isActive} onToggle={handleToggle} disabled={toggling} />
+          <button onClick={() => onDelete(banner)} className="text-[10px] font-bold bg-white border border-gray-200 hover:border-red-300 text-gray-500 hover:text-red-500 px-3 py-1.5 rounded-lg">Delete</button>
         </div>
       </div>
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN PAGE
-// ─────────────────────────────────────────────────────────────────────────────
 const ShowcaseBanners = ({ token }) => {
-  const [banners,     setBanners]     = useState([])
-  const [loading,     setLoading]     = useState(true)
-  const [editBanner,  setEditBanner]  = useState(null)   // null=closed | {} =create | banner=edit
-  const [deleteBanner,setDeleteBanner]= useState(null)
-  const [reordering,  setReordering]  = useState(false)
+  const [banners, setBanners] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showModal, setShowModal] = useState(false)
+  const [deleteBanner, setDeleteBanner] = useState(null)
+  const [reordering, setReordering] = useState(false)
 
-  // ── Fetch all banners (admin view) ────────────────────────────────────────
   const fetchBanners = useCallback(async () => {
     setLoading(true)
     try {
-      const { data } = await axios.get(
-        `${backendUrl}/api/showcase/admin/banners`,
-        { headers: { token } }
-      )
+      const { data } = await axios.get(backendUrl + '/api/showcase/admin/banners', { headers: { token } })
       if (data.success) setBanners(data.banners ?? [])
       else toast.error(data.message)
-    } catch (err) {
-      toast.error('Failed to load banners')
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
+    } catch (err) { toast.error('Failed to load'); console.error(err) }
+    finally { setLoading(false) }
   }, [token])
 
   useEffect(() => { fetchBanners() }, [fetchBanners])
 
-  // ── Patch helpers (avoid full refetch) ───────────────────────────────────
   const onSaved = (banner) => {
     setBanners(prev => {
       const exists = prev.find(b => b._id === banner._id)
-      return exists
-        ? prev.map(b => b._id === banner._id ? banner : b)
-        : [...prev, banner].sort((a, b) => a.order - b.order)
+      return exists ? prev.map(b => b._id === banner._id ? banner : b) : [...prev, banner].sort((a, b) => a.order - b.order)
     })
   }
+  const onToggle = (banner) => setBanners(prev => prev.map(b => b._id === banner._id ? banner : b))
+  const onDeleted = (id) => setBanners(prev => prev.filter(b => b._id !== id))
 
-  const onToggle = (banner) => {
-    setBanners(prev => prev.map(b => b._id === banner._id ? banner : b))
-  }
-
-  const onDeleted = (id) => {
-    setBanners(prev => prev.filter(b => b._id !== id))
-  }
-
-  // ── Move banner ↑↓ and save new order to backend ─────────────────────────
   const handleMove = async (fromIdx, toIdx) => {
     if (toIdx < 0 || toIdx >= banners.length) return
     const reordered = [...banners]
     const [moved] = reordered.splice(fromIdx, 1)
     reordered.splice(toIdx, 0, moved)
-    setBanners(reordered)  // optimistic update
-
+    setBanners(reordered)
     setReordering(true)
     try {
-      await axios.put(
-        `${backendUrl}/api/showcase/admin/reorder`,
-        { ids: reordered.map(b => b._id) },
-        { headers: { token } }
-      )
+      await axios.put(backendUrl + '/api/showcase/admin/reorder', { ids: reordered.map(b => b._id) }, { headers: { token } })
       toast.success('Order saved')
-    } catch (err) {
-      toast.error('Failed to save order — refreshing')
-      fetchBanners()  // revert on failure
-    } finally {
-      setReordering(false)
-    }
+    } catch (err) { toast.error('Failed to save order'); fetchBanners() }
+    finally { setReordering(false) }
   }
 
-  const activeCount   = banners.filter(b => b.isActive).length
-  const inactiveCount = banners.length - activeCount
+  const activeCount = banners.filter(b => b.isActive).length
 
   return (
-    <>
-      {/* Modals */}
-      {editBanner !== null && (
-        <BannerModal
-          banner={editBanner._id ? editBanner : null}
-          token={token}
-          onClose={() => setEditBanner(null)}
-          onSaved={onSaved}
-        />
-      )}
-      {deleteBanner && (
-        <DeleteModal
-          banner={deleteBanner}
-          token={token}
-          onClose={() => setDeleteBanner(null)}
-          onDeleted={onDeleted}
-        />
-      )}
+    <div style={{ maxWidth: 1000, width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {showModal && <BannerModal token={token} onClose={() => setShowModal(false)} onSaved={onSaved} />}
+      {deleteBanner && <DeleteModal banner={deleteBanner} token={token} onClose={() => setDeleteBanner(null)} onDeleted={onDeleted} />}
 
-      <div className="space-y-5 min-h-screen">
-
-        {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-black text-white tracking-tight">Showcase Banners</h1>
-            <p className="text-sm text-white/30 mt-1">
-              {loading ? 'Loading…' : (
-                <>
-                  <span className="text-cyan-400 font-bold">{activeCount}</span> active ·{' '}
-                  <span className="text-white/40">{inactiveCount}</span> hidden ·{' '}
-                  {reordering && <span className="text-amber-400 font-bold animate-pulse">Saving order…</span>}
-                </>
-              )}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={fetchBanners} disabled={loading}
-              className="flex items-center gap-2 bg-white/[0.05] hover:bg-white/[0.09] border border-white/[0.08] text-white/50 hover:text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-30">
-              <span className={`text-base ${loading ? 'animate-spin inline-block' : ''}`}>⟳</span>
-              Refresh
-            </button>
-            <button onClick={() => setEditBanner({})}
-              className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-5 py-2.5 rounded-xl text-sm font-black transition-all shadow-lg shadow-cyan-500/20">
-              ✨ Add Banner
-            </button>
-          </div>
-        </div>
-
-        {/* ── Info strip ────────────────────────────────────────────────── */}
-        <div className="bg-cyan-500/[0.06] border border-cyan-500/[0.12] rounded-2xl px-5 py-3 flex items-center gap-3">
-          <span className="text-cyan-400 text-lg flex-shrink-0">💡</span>
-          <p className="text-xs text-cyan-200/60 leading-relaxed">
-            Active banners are shown on the homepage in the order listed below.
-            Use the <span className="font-black text-cyan-300">↑↓ arrows</span> to reorder.
-            Toggle the switch to show/hide a banner without deleting it.
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#111827', margin: 0 }}>CTA Banners</h1>
+          <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>
+            {loading ? 'Loading...' : activeCount + ' active \u00B7 ' + (banners.length - activeCount) + ' hidden \u00B7 ' + banners.length + ' total'}
           </p>
         </div>
-
-        {/* ── Banner list ───────────────────────────────────────────────── */}
-        {loading ? (
-          <div className="space-y-3">
-            {[1,2,3].map(i => (
-              <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl h-24 animate-pulse" />
-            ))}
-          </div>
-        ) : banners.length === 0 ? (
-          <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-16 text-center">
-            <div className="text-5xl mb-4 opacity-20">🖼️</div>
-            <p className="text-white/30 text-sm font-bold">No banners yet</p>
-            <p className="text-white/15 text-xs mt-1">Click "Add Banner" to create your first showcase banner.</p>
-            <button onClick={() => setEditBanner({})}
-              className="mt-5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-black transition-all shadow-lg shadow-cyan-500/20 inline-flex items-center gap-2">
-              ✨ Add First Banner
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {banners.map((banner, idx) => (
-              <BannerCard
-                key={banner._id}
-                banner={banner}
-                index={idx}
-                total={banners.length}
-                token={token}
-                onEdit={setEditBanner}
-                onDelete={setDeleteBanner}
-                onToggle={onToggle}
-                onMove={handleMove}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* ── Homepage preview hint ─────────────────────────────────────── */}
-        {!loading && banners.length > 0 && (
-          <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl px-5 py-4">
-            <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.12em] mb-2">
-              Visitor-facing banner order
-            </p>
-            <div className="flex items-center gap-2 flex-wrap">
-              {banners.filter(b => b.isActive).map((b, i) => (
-                <div key={b._id} className="flex items-center gap-1.5">
-                  {i > 0 && <span className="text-white/15">→</span>}
-                  <span className="text-[10px] bg-white/[0.04] border border-white/[0.07] text-white/40 px-2 py-1 rounded-lg font-medium truncate max-w-[140px]">
-                    {b.title}
-                  </span>
-                </div>
-              ))}
-              {activeCount === 0 && (
-                <p className="text-xs text-amber-400/60">⚠️ No active banners — homepage will use static fallback.</p>
-              )}
-            </div>
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={fetchBanners} disabled={loading} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Refresh</button>
+          <button onClick={() => setShowModal(true)} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>+ Add Banner</button>
+        </div>
       </div>
-    </>
+
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[1,2,3].map(i => <div key={i} style={{ ...CARD, height: 72, background: '#f9fafb' }} />)}
+        </div>
+      ) : banners.length === 0 ? (
+        <div style={{ ...CARD, padding: 50, textAlign: 'center' }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>No banners yet</p>
+          <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>Create your first banner.</p>
+          <button onClick={() => setShowModal(true)} style={{ marginTop: 14, padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>+ Add First Banner</button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {banners.map((banner, idx) => (
+            <BannerCard key={banner._id} banner={banner} index={idx} total={banners.length} token={token} onDelete={setDeleteBanner} onToggle={onToggle} onMove={handleMove} />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

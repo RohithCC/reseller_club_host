@@ -10,12 +10,13 @@ import { addToCart }      from '../app/cartSlice'
 import { toggleWishlist } from '../app/wishlistSlice'
 import { FiShoppingCart, FiHeart } from 'react-icons/fi'
 
-const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000'
+const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmtPrice   = (n)   => `₹${Number(n ?? 0).toLocaleString('en-IN')}`
 const discPct    = (p,m) => (m > p ? Math.round(((m - p) / m) * 100) : 0)
 const resolveImg = (img) => Array.isArray(img) ? (img[0] || '') : (img || '')
+const resolveUrl = (path) => path?.startsWith('http') ? path : `${BACKEND}${path}`
 
 // ── Star rating — matches screenshot (filled amber, empty gray) ───────────────
 function Stars({ rating = 0 }) {
@@ -144,7 +145,7 @@ function ProductCard({ product }) {
         {/* Product image */}
         {image && !imgError ? (
           <img
-            src={image}
+            src={resolveUrl(image)}
             alt={product.name}
             className="object-contain p-5 group-hover:scale-105 transition-transform duration-500 w-full h-full"
             onError={() => setImgError(true)}

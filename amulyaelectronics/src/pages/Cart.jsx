@@ -17,6 +17,8 @@ import {
 } from "../app/cartSlice";
 
 import api from "../../utils/api";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:10000";
+const resolveUrl  = (path) => path?.startsWith("http") ? path : `${BACKEND_URL}${path}`;
 
 // ─── GST CONFIGURATION ───────────────────────────────────────────────
 const GST_INCLUSIVE    = false;
@@ -84,7 +86,7 @@ function CartItem({ item, onQtyChange, onRemove }) {
           {/* FIX: only render <img> when src is a non-empty string */}
           {image ? (
             <img
-              src={image}
+              src={resolveUrl(image)}
               alt={item.name}
               className="max-w-full max-h-full object-contain"
               onError={(e) => { e.target.src = "https://placehold.co/120x120?text=Product"; }}
@@ -198,7 +200,7 @@ export default function Cart() {
   const appliedCoupon = reduxCoupon ?? null;
 
   const [deliveryInfo, setDeliveryInfo] = useState({
-    charge: 0, freeAbove: 499, freeDelivery: false, amountToFreeDelivery: 0,
+    charge: 0, freeAbove: 999, freeDelivery: false, amountToFreeDelivery: 0,
     estimatedDaysMin: 4, estimatedDaysMax: 7, method: "standard", loading: false,
   });
 

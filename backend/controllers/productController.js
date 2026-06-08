@@ -1,5 +1,5 @@
 // controllers/productController.js
-import { v2 as cloudinary } from "cloudinary"
+import { rmSync, existsSync } from 'fs'
 import productModel from "../models/productModel.js"
 
 // ─── Helper: recalculate averageRating & totalReviews ────────────────────────
@@ -20,17 +20,32 @@ const parseField = (val, fallback) => {
   try { return JSON.parse(val) } catch { return fallback }
 }
 
-// ─── Helper: upload images to Cloudinary ─────────────────────────────────────
+// ─── Helper: get local image URL path from a multer file ──────────────────────
+const localImageUrl = (file) => `/uploads/${file.filename}`
+
+// ─── Helper: upload images to local storage ───────────────────────────────────
+// Multer already saved files to uploads/ with unique names.
+// We just return the local URL path for each image.
 const uploadImages = async (files) => {
   const slots = ["image1", "image2", "image3", "image4"]
   const toUpload = slots.map((k) => files?.[k]?.[0]).filter(Boolean)
-  return Promise.all(
-    toUpload.map((item) =>
-      cloudinary.uploader
-        .upload(item.path, { resource_type: "image", folder: "amulya_electronics" })
-        .then((r) => r.secure_url)
-    )
-  )
+  return toUpload.map(localImageUrl)
+}
+
+// ─── Helper: delete image files from disk ─────────────────────────────────────
+const deleteImageFiles = (imageUrls = []) => {
+  for (const url of imageUrls) {
+    if (!url || !url.startsWith('/uploads/')) continue
+    const filePath = `.${url}`  // e.g. ./uploads/filename.jpg
+    try {
+      if (existsSync(filePath)) {
+        rmSync(filePath)
+        console.log(`[deleteImage] Deleted: ${filePath}`)
+      }
+    } catch (err) {
+      console.error(`[deleteImage] Failed to delete ${filePath}:`, err.message)
+    }
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -108,16 +123,19 @@ const updateProduct = async (req, res) => {
 
     // Replace only image slots that received a new file
     let updatedImages = [...product.image]
+    const oldImagesToDelete = []
     for (let i = 1; i <= 4; i++) {
       const file = req.files?.[`image${i}`]?.[0]
       if (file) {
-        const result = await cloudinary.uploader.upload(file.path, {
-          resource_type: "image",
-          folder: "amulya_electronics",
-        })
-        updatedImages[i - 1] = result.secure_url
+        // Track old image for deletion
+        if (updatedImages[i - 1]?.startsWith('/uploads/')) {
+          oldImagesToDelete.push(updatedImages[i - 1])
+        }
+        updatedImages[i - 1] = localImageUrl(file)
       }
     }
+    // Delete old image files from disk
+    deleteImageFiles(oldImagesToDelete)
 
     const updates = {
       ...(name          !== undefined && { name: name.trim() }),
@@ -156,6 +174,10 @@ const removeProduct = async (req, res) => {
   try {
     const product = await productModel.findByIdAndDelete(req.body.id)
     if (!product) return res.json({ success: false, message: "Product not found" })
+
+    // Delete associated image files from disk
+    deleteImageFiles(product.image)
+
     res.json({ success: true, message: "Product Removed" })
   } catch (error) {
     console.error("removeProduct:", error)
@@ -177,21 +199,21 @@ const listProducts = async (req, res) => {
       minRating,
       bestseller, isHot, isFeatured, inStock,
       tags,
-      sort  = "date",
-      page  = 1,
-      limit = 12,
+      sort   = "date",
+      page,           // undefined by default → no pagination applied
+      limit,          // undefined by default → no limit applied
       search,
     } = req.query
 
     const query = {}
-    if (category)    query.category    = category
-    if (subCategory) query.subCategory = subCategory
-    if (inStock  !== undefined) query.inStock    = inStock    === "true"
-    if (bestseller!==undefined) query.bestseller = bestseller === "true"
-    if (isHot    !== undefined) query.isHot      = isHot      === "true"
-    if (isFeatured!==undefined) query.isFeatured = isFeatured === "true"
-    if (minRating)   query.averageRating = { $gte: Number(minRating) }
-    if (tags)        query.tags = { $in: tags.split(",") }
+    if (category)             query.category       = category
+    if (subCategory)          query.subCategory    = subCategory
+    if (inStock    !== undefined) query.inStock     = inStock    === "true"
+    if (bestseller !== undefined) query.bestseller  = bestseller === "true"
+    if (isHot      !== undefined) query.isHot       = isHot      === "true"
+    if (isFeatured !== undefined) query.isFeatured  = isFeatured === "true"
+    if (minRating)            query.averageRating   = { $gte: Number(minRating) }
+    if (tags)                 query.tags            = { $in: tags.split(",") }
 
     if (search) {
       query.$or = [
@@ -215,24 +237,31 @@ const listProducts = async (req, res) => {
       rating:     { averageRating: -1 },
     }
 
-    const skip  = (Number(page) - 1) * Number(limit)
     const total = await productModel.countDocuments(query)
 
-    const products = await productModel
-      .find(query, { reviews: 0 })              // exclude heavy reviews array in list view
+    // Build query — only apply skip/limit when caller explicitly passes page/limit
+    let dbQuery = productModel
+      .find(query, { reviews: 0 })
       .sort(sortOptions[sort] || { date: -1 })
-      .skip(skip)
-      .limit(Number(limit))
-      .lean()
+
+    if (page && limit) {
+      const skip = (Number(page) - 1) * Number(limit)
+      dbQuery = dbQuery.skip(skip).limit(Number(limit))
+    } else if (limit) {
+      dbQuery = dbQuery.limit(Number(limit))
+    }
+    // if neither page nor limit is provided → no skip/limit → ALL products returned
+
+    const products = await dbQuery.lean()
 
     res.json({
       success: true,
       products,
       pagination: {
         total,
-        page:       Number(page),
-        limit:      Number(limit),
-        totalPages: Math.ceil(total / Number(limit)),
+        page:       page  ? Number(page)  : 1,
+        limit:      limit ? Number(limit) : total,  // reflect actual count returned
+        totalPages: limit ? Math.ceil(total / Number(limit)) : 1,
       },
     })
   } catch (error) {
@@ -240,7 +269,6 @@ const listProducts = async (req, res) => {
     res.json({ success: false, message: error.message })
   }
 }
-
 // ─── SINGLE PRODUCT ──────────────────────────────────────────────────────────
 // POST /api/product/single
 // Body: { productId }

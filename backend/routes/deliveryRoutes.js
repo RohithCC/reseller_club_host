@@ -5,11 +5,12 @@ import express from "express";
 import {
   calculateDelivery,
   listDeliveryOptions,
+  adminListDeliveryCharges,
   createDeliveryCharge,
   updateDeliveryCharge,
   deleteDeliveryCharge,
 } from "../controllers/deliveryChargeController.js";
-// import { isAuth, isAdmin } from "../middleware/auth.js";
+import { adminOrSuperAdminAuth } from "../middleware/adminAuth.js";
 
 const router = express.Router();
 
@@ -17,9 +18,10 @@ const router = express.Router();
 router.post("/calculate", calculateDelivery);
 router.get("/options",    listDeliveryOptions);
 
-// Admin
-router.post("/",       /* isAuth, isAdmin, */ createDeliveryCharge);
-router.put("/:id",     /* isAuth, isAdmin, */ updateDeliveryCharge);
-router.delete("/:id",  /* isAuth, isAdmin, */ deleteDeliveryCharge);
+// Admin (admin/super_admin only)
+router.get("/admin/all", adminOrSuperAdminAuth, adminListDeliveryCharges);
+router.post("/",         adminOrSuperAdminAuth, createDeliveryCharge);
+router.put("/:id",       adminOrSuperAdminAuth, updateDeliveryCharge);
+router.delete("/:id",    adminOrSuperAdminAuth, deleteDeliveryCharge);
 
 export default router;

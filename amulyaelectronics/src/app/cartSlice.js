@@ -79,9 +79,7 @@ export const loadCart = createAsyncThunk(
     const token = getToken(getState());
     if (!token) return null; // guest: nothing to load from server
     try {
-      const { data } = await api.get("/api/cart", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const { data } = await api.get("/api/cart");
       if (!data.success) return rejectWithValue(data.message);
       return normaliseServerCart(data.cart);
     } catch (err) {
@@ -104,8 +102,7 @@ export const addToCart = createAsyncThunk(
     try {
       const { data } = await api.post(
         "/api/cart/add",
-        toServerPayload(product),
-        { headers: { Authorization: `Bearer ${token}` } }
+        toServerPayload(product)
       );
       if (!data.success) return rejectWithValue(data.message);
       return normaliseServerCart(data.cart);
@@ -129,8 +126,7 @@ export const updateItemQty = createAsyncThunk(
     try {
       const { data } = await api.put(
         "/api/cart/update",
-        { productId: id, quantity },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { productId: id, quantity }
       );
       if (!data.success) return rejectWithValue(data.message);
       return normaliseServerCart(data.cart);
@@ -152,9 +148,7 @@ export const removeItem = createAsyncThunk(
     if (!token) return null;
 
     try {
-      const { data } = await api.delete(`/api/cart/item/${productId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const { data } = await api.delete(`/api/cart/item/${productId}`);
       if (!data.success) return rejectWithValue(data.message);
       return normaliseServerCart(data.cart);
     } catch (err) {
@@ -180,9 +174,7 @@ export const clearAll = createAsyncThunk(
     if (!token) return null; // guest: reducer handles everything
 
     try {
-      const { data } = await api.delete("/api/cart/clear", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const { data } = await api.delete("/api/cart/clear");
       if (!data.success) return rejectWithValue(data.message);
       // Server cleared both items and coupon — reflect that in Redux
       return { items: [], coupon: null };
@@ -206,8 +198,7 @@ export const saveCoupon = createAsyncThunk(
     try {
       const { data } = await api.put(
         "/api/cart/coupon",
-        { coupon: coupon ?? null },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { coupon: coupon ?? null }
       );
       if (!data.success) return rejectWithValue(data.message);
       // Return whatever the server echoes back on the cart
@@ -238,8 +229,7 @@ export const syncGuestCartToServer = createAsyncThunk(
     try {
       const { data } = await api.post(
         "/api/cart/sync",
-        { items: guestItems.map(toServerPayload) },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { items: guestItems.map(toServerPayload) }
       );
       if (!data.success) return rejectWithValue(data.message);
       return normaliseServerCart(data.cart);
@@ -277,7 +267,7 @@ function guestAdd(state, product) {
   const id       = product.id ?? product.productId;
   const existing = state.items.find((i) => i.id === id);
   if (existing) {
-    existing.quantity = Math.min(existing.quantity + (product.quantity ?? 1), 10);
+    existing.quantity = Math.min(existing.quantity + (product.quantity ?? 1), 9999999);
   } else {
     state.items.push({
       id,
@@ -287,7 +277,7 @@ function guestAdd(state, product) {
       price:     product.price   ?? 0,
       mrp:       product.mrp     ?? product.price ?? 0,
       subcat:    product.subcat  ?? product.subCategory ?? "",
-      quantity:  Math.min(product.quantity ?? 1, 10),
+      quantity:  Math.min(product.quantity ?? 1, 9999999),
       gstRate:   product.gstRate ?? product.taxRate ?? undefined,
     });
   }
@@ -299,7 +289,7 @@ function guestUpdateQty(state, id, quantity) {
   if (quantity <= 0) {
     state.items.splice(idx, 1);
   } else {
-    state.items[idx].quantity = Math.min(quantity, 10);
+    state.items[idx].quantity = Math.min(quantity, 9999999);
   }
 }
 

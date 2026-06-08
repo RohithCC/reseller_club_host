@@ -168,11 +168,27 @@ const orderSchema = new mongoose.Schema(
 // ─────────────────────────────────────────────────────────────────────────────
 // PRE-SAVE HOOK — orderNumber + keep mirrors in sync
 // ─────────────────────────────────────────────────────────────────────────────
-orderSchema.pre("save", function (next) {
+orderSchema.pre("save", async function (next) {
   if (!this.orderNumber) {
-    const date   = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-    this.orderNumber = `AE-${date}-${random}`;
+    const now = new Date();
+    const mm  = String(now.getMonth() + 1).padStart(2, "0");
+    const yy  = String(now.getFullYear()).slice(-2);
+    const prefix = `AE-${mm}${yy}-`;
+
+    // Find the highest existing order number for this month-year prefix
+    const lastOrder = await this.constructor
+      .findOne({ orderNumber: { $regex: `^${prefix}` } })
+      .sort({ orderNumber: -1 })
+      .select("orderNumber")
+      .lean();
+
+    let nextNum = 1;
+    if (lastOrder) {
+      const lastNum = parseInt(lastOrder.orderNumber.split("-").pop(), 10);
+      nextNum = lastNum + 1;
+    }
+
+    this.orderNumber = `${prefix}${String(nextNum).padStart(4, "0")}`;
   }
   if (this.coupon && typeof this.coupon.discount === "number") {
     this.couponDiscount = this.coupon.discount;
@@ -215,7 +231,7 @@ orderSchema.methods.pushTracking = function (status, message = "", location = ""
 // INDEXES
 // ─────────────────────────────────────────────────────────────────────────────
 orderSchema.index({ userId: 1, createdAt: -1 });
-orderSchema.index({ orderNumber: 1 },                        { unique: true });
+// orderNumber unique index is already created via `unique: true` on the field definition above.
 orderSchema.index({ "payment.razorpayOrderId":   1 });
 orderSchema.index({ "payment.razorpayPaymentId": 1 });
 orderSchema.index({ "coupon.ref":   1 });

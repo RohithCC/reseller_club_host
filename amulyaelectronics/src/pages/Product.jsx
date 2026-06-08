@@ -12,6 +12,7 @@ import { toggleWishlist }           from "../app/wishlistSlice";
 import axios from "axios";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:10000";
+const resolveUrl = (path) => path?.startsWith('http') ? path : `${BACKEND_URL}${path}`;
 
 // ─── StarRating ───────────────────────────────────────────────────────────────
 function StarRating({ rating, size = 16, interactive = false, onRate }) {
@@ -57,13 +58,14 @@ function ImageCarousel({ images = [], productName }) {
         onClick={() => setZoomed(!zoomed)}
       >
         <img
-          src={images[activeIdx]} alt={productName}
+          src={resolveUrl(images[activeIdx])} alt={productName}
           style={{ width: "100%", height: "100%", objectFit: "contain", padding: 24,
             transform: zoomed ? "scale(1.6)" : "scale(1)", transition: "transform 0.3s ease" }}
+          onError={(e) => { e.target.style.display = 'none'; e.target.parentElement && (e.target.parentElement.innerText = 'No Image'); }}
         />
         {images.length > 1 && (
           <>
-            <button onClick={(e) => { e.stopPropagation(); prev(); }} style={carouselBtn("left")}><ChevronLeft size={18} /></button>
+            <button onClick={(e) => { e.stopPropagation(); prev(); }} style={carouselBtn("left")}>          <ChevronLeft size={18} /></button>
             <button onClick={(e) => { e.stopPropagation(); next(); }} style={carouselBtn("right")}><ChevronRight size={18} /></button>
           </>
         )}
@@ -83,7 +85,7 @@ function ImageCarousel({ images = [], productName }) {
               border: i === activeIdx ? "2px solid #3b82f6" : "2px solid #e2e8f0",
               overflow: "hidden", background: "#f8fafc", padding: 4,
               cursor: "pointer", flexShrink: 0, transition: "border-color 0.2s" }}>
-            <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+            <img src={resolveUrl(img)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} onError={(e) => { e.target.style.display = 'none'; }} />
           </button>
         ))}
       </div>
@@ -168,7 +170,7 @@ function SimilarCard({ product }) {
       </button>
       <div style={{ background: "#f8fafc", padding: 16, display: "flex",
         alignItems: "center", justifyContent: "center", aspectRatio: "1/1" }}>
-        <img src={image} alt={product.name}
+        <img src={resolveUrl(image)} alt={product.name}
           style={{ width: "100%", height: "100%", objectFit: "contain", maxHeight: 140 }}
           onError={(e) => { e.target.src = "https://placehold.co/200x160?text=Product"; }} />
       </div>
@@ -212,7 +214,6 @@ function resolveReviewName(r) {
 }
 
 // ─── Use-case icon map ────────────────────────────────────────────────────────
-// Keys match ICON_OPTIONS in Add.jsx / List.jsx exactly
 const USE_CASE_ICONS = {
   IoT:          <Radio size={20} />,
   Prototyping:  <Wrench size={20} />,
@@ -225,7 +226,6 @@ const USE_CASE_ICONS = {
   Default:      <Lightbulb size={20} />,
 };
 
-// 1) exact stored hint  2) scan label text  3) fallback Default
 function getUseCaseIcon(iconHint = "", label = "") {
   if (iconHint && USE_CASE_ICONS[iconHint]) return USE_CASE_ICONS[iconHint];
   const key = Object.keys(USE_CASE_ICONS).find(
@@ -235,7 +235,6 @@ function getUseCaseIcon(iconHint = "", label = "") {
 }
 
 // ─── WhatYouCanDoTab ──────────────────────────────────────────────────────────
-// Priority: product.useCases (DB) → tags (auto) → generic defaults
 function WhatYouCanDoTab({ product }) {
   const storedUseCases = product.useCases      ?? [];
   const tags           = product.tags          ?? [];
@@ -261,8 +260,6 @@ function WhatYouCanDoTab({ product }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-
-      {/* Hero banner */}
       <div style={{ background: "linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)",
         borderRadius: 16, padding: "24px 28px", border: "1px solid #bfdbfe",
         display: "flex", alignItems: "center", gap: 16 }}>
@@ -281,7 +278,6 @@ function WhatYouCanDoTab({ product }) {
         </div>
       </div>
 
-      {/* Use-case cards grid */}
       <div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
           <h4 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: 0 }}>
@@ -327,7 +323,6 @@ function WhatYouCanDoTab({ product }) {
         </div>
       </div>
 
-      {/* Key features — "what it does" */}
       {features.length > 0 && (
         <div>
           <h4 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>
@@ -345,7 +340,6 @@ function WhatYouCanDoTab({ product }) {
         </div>
       )}
 
-      {/* Technical highlights from specs */}
       {Object.keys(specs).length > 0 && (
         <div>
           <h4 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>
@@ -363,7 +357,6 @@ function WhatYouCanDoTab({ product }) {
         </div>
       )}
 
-      {/* Who is this for? */}
       <div style={{ background: "#fff7ed", border: "1px solid #fed7aa",
         borderRadius: 14, padding: "20px 22px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
@@ -380,7 +373,6 @@ function WhatYouCanDoTab({ product }) {
         </p>
       </div>
 
-      {/* Warranty & returns callout */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         {[
           { icon: <Shield size={18} />,    title: product.warranty     || "1 Year Warranty", color: "#3b82f6", bg: "#eff6ff" },
@@ -397,6 +389,7 @@ function WhatYouCanDoTab({ product }) {
   );
 }
 
+
 // ─── Main Product Page ────────────────────────────────────────────────────────
 export default function Product() {
   const { productId } = useParams();
@@ -405,7 +398,7 @@ export default function Product() {
 
   const cartItems     = useSelector((s) => s.cart.items);
   const wishlistItems = useSelector((s) => s.wishlist.items);
-  const token = useSelector((s) => s.auth?.token ?? "") || localStorage.getItem("token") || "";
+  const token = useSelector((s) => s.auth?.token ?? "") || localStorage.getItem("amulya_token") || "";
 
   const [product,        setProduct]        = useState(null);
   const [similar,        setSimilar]        = useState([]);
@@ -540,8 +533,17 @@ export default function Product() {
   };
 
   const handleAddToCart = () => dispatch(addToCart({ ...cartProduct, quantity: qty }));
-  const handleInc       = () => dispatch(updateItemQty({ id: pid, quantity: cartQty + 1 }));
-  const handleDec       = () => { if (cartQty > 1) dispatch(updateItemQty({ id: pid, quantity: cartQty - 1 })); };
+  const handleInc       = () => {
+    if (inCart) dispatch(updateItemQty({ id: pid, quantity: cartQty + 1 }));
+    else setQty((q) => q + 1);
+  };
+  const handleDec       = () => {
+    if (inCart) {
+      if (cartQty > 1) dispatch(updateItemQty({ id: pid, quantity: cartQty - 1 }));
+    } else {
+      setQty((q) => Math.max(1, q - 1));
+    }
+  };
   const handleWishlist  = () => dispatch(toggleWishlist(cartProduct));
 
   const ratingBreakdown = [5, 4, 3, 2, 1].map((s) => ({
@@ -657,62 +659,67 @@ export default function Product() {
             {/* QTY + ACTIONS */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
 
-              {!inCart && (
-                <div style={{ display: "flex", alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
-                  <button onClick={() => setQty((q) => Math.max(1, q - 1))} style={{ width: 40, height: 44, background: "#f8fafc", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#374151" }}><Minus size={14} /></button>
-                  <span style={{ width: 44, textAlign: "center", fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{qty}</span>
-                  <button onClick={() => setQty((q) => Math.min(10, q + 1))} style={{ width: 40, height: 44, background: "#f8fafc", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#374151" }}><Plus size={14} /></button>
-                </div>
-              )}
+              {/* Row 1: qty stepper + add/buy/wishlist/share */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", width: "100%" }}>
 
-              {inCart ? (
-                <div style={{ display: "flex", alignItems: "center", border: "2px solid #3b82f6", borderRadius: 10, overflow: "hidden" }}>
-                  <button onClick={handleDec} disabled={cartQty <= 1}
-                    style={{ width: 42, height: 44, background: "#eff6ff", border: "none", cursor: cartQty <= 1 ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#3b82f6", opacity: cartQty <= 1 ? 0.4 : 1 }}>
-                    <Minus size={14} />
+                {!inCart && (
+                  <div style={{ display: "flex", alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
+                    <button onClick={() => setQty((q) => Math.max(1, q - 1))} style={{ width: 40, height: 44, background: "#f8fafc", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#374151" }}><Minus size={14} /></button>
+                    <span style={{ width: 44, textAlign: "center", fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{qty}</span>
+                    <button onClick={() => setQty((q) => q + 1)} style={{ width: 40, height: 44, background: "#f8fafc", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#374151" }}><Plus size={14} /></button>
+                  </div>
+                )}
+
+                {inCart ? (
+                  <div style={{ display: "flex", alignItems: "center", border: "2px solid #3b82f6", borderRadius: 10, overflow: "hidden" }}>
+                    <button onClick={handleDec} disabled={cartQty <= 1}
+                      style={{ width: 42, height: 44, background: "#eff6ff", border: "none", cursor: cartQty <= 1 ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#3b82f6", opacity: cartQty <= 1 ? 0.4 : 1 }}>
+                      <Minus size={14} />
+                    </button>
+                    <span style={{ padding: "0 16px", textAlign: "center", fontWeight: 800, fontSize: 15, color: "#1d4ed8", borderLeft: "2px solid #bfdbfe", borderRight: "2px solid #bfdbfe" }}>
+                      {cartQty} in cart
+                    </span>
+                    <button onClick={handleInc} disabled={cartQty >= 10000}
+                      style={{ width: 42, height: 44, background: "#eff6ff", border: "none", cursor: cartQty >= 10000 ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#3b82f6", opacity: cartQty >= 10000 ? 0.4 : 1 }}>
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={handleAddToCart} disabled={!product.inStock}
+                    style={{ flex: 1, minWidth: 140, height: 44, background: product.inStock ? "#3b82f6" : "#e5e7eb", color: product.inStock ? "#fff" : "#9ca3af", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: product.inStock ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                    onMouseEnter={(e) => { if (product.inStock) e.currentTarget.style.background = "#2563eb"; }}
+                    onMouseLeave={(e) => { if (product.inStock) e.currentTarget.style.background = "#3b82f6"; }}>
+                    <ShoppingCart size={17} />
+                    {product.inStock ? "Add to Cart" : "Out of Stock"}
                   </button>
-                  <span style={{ padding: "0 16px", textAlign: "center", fontWeight: 800, fontSize: 15, color: "#1d4ed8", borderLeft: "2px solid #bfdbfe", borderRight: "2px solid #bfdbfe" }}>
-                    {cartQty} in cart
-                  </span>
-                  <button onClick={handleInc} disabled={cartQty >= 10}
-                    style={{ width: 42, height: 44, background: "#eff6ff", border: "none", cursor: cartQty >= 10 ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#3b82f6", opacity: cartQty >= 10 ? 0.4 : 1 }}>
-                    <Plus size={14} />
-                  </button>
-                </div>
-              ) : (
-                <button onClick={handleAddToCart} disabled={!product.inStock}
-                  style={{ flex: 1, minWidth: 140, height: 44, background: product.inStock ? "#3b82f6" : "#e5e7eb", color: product.inStock ? "#fff" : "#9ca3af", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: product.inStock ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-                  onMouseEnter={(e) => { if (product.inStock) e.currentTarget.style.background = "#2563eb"; }}
-                  onMouseLeave={(e) => { if (product.inStock) e.currentTarget.style.background = "#3b82f6"; }}>
-                  <ShoppingCart size={17} /> {product.inStock ? "Add to Cart" : "Out of Stock"}
+                )}
+
+                <button onClick={() => { dispatch(addToCart({ ...cartProduct, quantity: qty })); navigate("/cart"); }} disabled={!product.inStock}
+                  style={{ flex: 1, minWidth: 120, height: 44, background: product.inStock ? "#0f172a" : "#e5e7eb", color: product.inStock ? "#fff" : "#9ca3af", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: product.inStock ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <Zap size={16} /> Buy Now
+                </button>
+
+                <button onClick={handleWishlist}
+                  style={{ width: 44, height: 44, border: `1px solid ${wished ? "#fca5a5" : "#e2e8f0"}`, borderRadius: 10, background: wished ? "#fef2f2" : "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: wished ? "#ef4444" : "#9ca3af", transition: "all 0.2s" }}>
+                  <Heart size={18} fill={wished ? "#ef4444" : "none"} />
+                </button>
+
+                <button onClick={() => { navigator.clipboard?.writeText(window.location.href); }}
+                  style={{ width: 44, height: 44, border: "1px solid #e2e8f0", borderRadius: 10, background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af" }}
+                  title="Copy link">
+                  <Share2 size={18} />
+                </button>
+              </div>
+
+              {inCart && (
+                <button onClick={() => navigate("/cart")}
+                  style={{ alignSelf: "flex-start", padding: "8px 20px", background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+                  <Check size={14} /> View Cart ({cartQty} item{cartQty > 1 ? "s" : ""})
                 </button>
               )}
-
-              <button onClick={() => { dispatch(addToCart({ ...cartProduct, quantity: qty })); navigate("/cart"); }} disabled={!product.inStock}
-                style={{ flex: 1, minWidth: 120, height: 44, background: product.inStock ? "#0f172a" : "#e5e7eb", color: product.inStock ? "#fff" : "#9ca3af", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: product.inStock ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                <Zap size={16} /> Buy Now
-              </button>
-
-              <button onClick={handleWishlist}
-                style={{ width: 44, height: 44, border: `1px solid ${wished ? "#fca5a5" : "#e2e8f0"}`, borderRadius: 10, background: wished ? "#fef2f2" : "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: wished ? "#ef4444" : "#9ca3af", transition: "all 0.2s" }}>
-                <Heart size={18} fill={wished ? "#ef4444" : "none"} />
-              </button>
-
-              <button onClick={() => { navigator.clipboard?.writeText(window.location.href); }}
-                style={{ width: 44, height: 44, border: "1px solid #e2e8f0", borderRadius: 10, background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af" }}
-                title="Copy link">
-                <Share2 size={18} />
-              </button>
             </div>
 
-            {inCart && (
-              <button onClick={() => navigate("/cart")}
-                style={{ alignSelf: "flex-start", padding: "8px 20px", background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
-                <Check size={14} /> View Cart ({cartQty} item{cartQty > 1 ? "s" : ""})
-              </button>
-            )}
-
-            {/* Tags — always prefix # */}
+            {/* Tags */}
             {tags.length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {tags.map((t) => (
@@ -740,7 +747,6 @@ export default function Product() {
         {/* ── TABS ── */}
         <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 8px rgba(0,0,0,0.06)", marginBottom: 32, overflow: "hidden" }}>
 
-          {/* Tab bar — horizontally scrollable on mobile */}
           <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb", overflowX: "auto" }}>
             {tabs.map((tab) => (
               <button key={tab.key} onClick={() => setActiveTab(tab.key)}
@@ -756,7 +762,6 @@ export default function Product() {
 
           <div style={{ padding: 32 }}>
 
-            {/* Description */}
             {activeTab === "description" && (
               <div>
                 <p style={{ fontSize: 15, color: "#374151", lineHeight: 1.8, marginBottom: 24, whiteSpace: "pre-line" }}>
@@ -777,12 +782,10 @@ export default function Product() {
               </div>
             )}
 
-            {/* What You Can Do — uses stored useCases with tag/default fallback */}
             {activeTab === "what-you-can-do" && (
               <WhatYouCanDoTab product={product} />
             )}
 
-            {/* Specifications */}
             {activeTab === "specifications" && (
               <div>
                 <h3 style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>Technical Specifications</h3>
@@ -803,11 +806,9 @@ export default function Product() {
               </div>
             )}
 
-            {/* Reviews */}
             {activeTab === "reviews" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
 
-                {/* Rating summary */}
                 <div style={{ display: "flex", gap: 40, flexWrap: "wrap", alignItems: "flex-start" }}>
                   <div style={{ textAlign: "center", minWidth: 120 }}>
                     <div style={{ fontSize: 56, fontWeight: 900, color: "#0f172a", lineHeight: 1 }}>{rating}</div>
@@ -821,7 +822,6 @@ export default function Product() {
                   </div>
                 </div>
 
-                {/* Sort */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", margin: 0 }}>Customer Reviews</h3>
                   <select value={sortReviews} onChange={(e) => setSortReviews(e.target.value)}
@@ -832,7 +832,6 @@ export default function Product() {
                   </select>
                 </div>
 
-                {/* Review cards */}
                 {sortedReviews.length === 0 ? (
                   <p style={{ color: "#9ca3af", fontSize: 14, textAlign: "center", padding: "24px 0" }}>
                     No reviews yet. Be the first to review!
@@ -859,7 +858,6 @@ export default function Product() {
                   </div>
                 )}
 
-                {/* Write a review */}
                 <div style={{ background: "#f8fafc", borderRadius: 16, padding: 24, border: "1px solid #e5e7eb" }}>
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginBottom: 20 }}>Write a Review</h3>
 

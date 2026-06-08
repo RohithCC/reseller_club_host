@@ -4,8 +4,8 @@
 //   1. User clicks camera icon → file picker opens
 //   2. File is read as base64 → shown as preview instantly
 //   3. On Save → base64 sent to POST /api/user/update-profile
-//   4. Backend uploads to Cloudinary → saves secure_url to MongoDB
-//   5. authSlice patches state with returned Cloudinary URL
+//   4. Backend saves to uploads/avatars/ → stores /uploads/ path in MongoDB
+//   5. authSlice patches state with returned avatar URL
 //
 import { useEffect, useState, useRef }  from "react";
 import { Link, useNavigate }            from "react-router-dom";
@@ -29,6 +29,9 @@ import {
   selectUpdateSuccess,
   selectIsLoggedIn,
 } from "../app/authSlice";
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:10000";
+const resolveUrl  = (path) => path?.startsWith("http") ? path : `${BACKEND_URL}${path}`;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmtDate  = (ms) => ms
@@ -146,7 +149,7 @@ export default function Profile() {
   const handleSave = () => {
     if (!form.name.trim()) return;
     // form.avatar is either:
-    //   • base64 string  → backend uploads to Cloudinary
+    //   • base64 string  → backend saves to uploads/avatars/
     //   • https:// URL   → backend stores directly
     //   • ""             → backend skips avatar update
     dispatch(updateUserProfile({
@@ -162,7 +165,7 @@ export default function Profile() {
   };
 
   // File picker → read as base64 → preview immediately
-  // Base64 is sent to backend on Save, then uploaded to Cloudinary server-side
+  // Base64 is sent to backend on Save, then saved to uploads/avatars/
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -261,7 +264,7 @@ export default function Profile() {
               {/* Avatar */}
               <div className="relative">
                 {avatarSrc ? (
-                  <img src={avatarSrc} alt={user.name}
+                  <img src={resolveUrl(avatarSrc)} alt={user.name}
                     className="w-20 h-20 rounded-2xl border-4 border-white shadow-lg object-cover"
                     onError={(e) => { e.target.style.display = "none"; }} />
                 ) : (
@@ -315,7 +318,7 @@ export default function Profile() {
                     >
                       {updating
                         ? <><span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                            {/* Show "Uploading…" if avatar is base64 (Cloudinary upload in progress) */}
+                            {/* Show "Uploading…" if avatar is base64 */}
                             {form.avatar?.startsWith("data:") ? "Uploading…" : "Saving…"}
                           </>
                         : <><FiCheck size={12} /> Save Changes</>
@@ -374,7 +377,7 @@ export default function Profile() {
                   {/* Show filename hint when a file has been picked */}
                   {form.avatar.startsWith("data:") && (
                     <p className="text-[10px] text-violet-600 font-semibold mt-1 flex items-center gap-1">
-                      <FiCamera size={10} /> Photo selected — will upload to Cloudinary on save
+                      <FiCamera size={10} /> Photo selected — will upload on save
                     </p>
                   )}
                 </div>

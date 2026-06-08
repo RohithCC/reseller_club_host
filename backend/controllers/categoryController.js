@@ -1,15 +1,25 @@
 // controllers/categoryController.js
-import { v2 as cloudinary } from 'cloudinary'
+import { rmSync, existsSync } from 'fs'
 import categoryModel, { toSlug } from '../models/categoryModel.js'
 
-// ─── Helper: upload image to Cloudinary (returns URL or '') ───────────────────
-const uploadImage = async (file) => {
-    if (!file) return ''
-    const result = await cloudinary.uploader.upload(file.path, {
-        resource_type: 'image',
-        folder: 'amulya_electronics/categories',
-    })
-    return result.secure_url
+// ─── Helper: local image URL ───────────────────────────────────────────────────
+const localImageUrl = (file) => (file ? `/uploads/${file.filename}` : '')
+
+// ─── Helper: delete image file(s) from disk ───────────────────────────────────
+const deleteImageFiles = (urls) => {
+    if (!urls || (Array.isArray(urls) && urls.length === 0)) return
+    const arr = Array.isArray(urls) ? urls : [urls]
+    for (const url of arr) {
+        if (!url || typeof url !== 'string') continue
+        // Only delete local /uploads/ files, not external URLs
+        if (!url.startsWith('/uploads/')) continue
+        try {
+            const filePath = `.${url}`  // e.g. './uploads/abc.jpg'
+            if (existsSync(filePath)) rmSync(filePath)
+        } catch (err) {
+            console.error('deleteImageFiles error:', url, err.message)
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -30,13 +40,11 @@ const addCategory = async (req, res) => {
         const exists = await categoryModel.findOne({ name: { $regex: `^${name}$`, $options: 'i' } })
         if (exists) return res.json({ success: false, message: 'Category already exists' })
 
-        const imageUrl = await uploadImage(req.file)
-
         const category = new categoryModel({
             name,
             slug:        toSlug(name),
             description: description || '',
-            image:       imageUrl,
+            image:       localImageUrl(req.file),
             isActive:    isActive !== undefined ? isActive === 'true' : true,
             sortOrder:   Number(sortOrder) || 0,
         })
@@ -108,9 +116,10 @@ const updateCategory = async (req, res) => {
         if (sortOrder   !== undefined) category.sortOrder   = Number(sortOrder)
         if (isActive    !== undefined) category.isActive    = isActive === 'true'
 
-        // Upload new image only if a file was sent
+        // Delete old image file if a new one is uploaded
         if (req.file) {
-            category.image = await uploadImage(req.file)
+            deleteImageFiles(category.image)
+            category.image = localImageUrl(req.file)
         }
 
         await category.save()
@@ -128,6 +137,9 @@ const removeCategory = async (req, res) => {
         const { categoryId } = req.body
         const category = await categoryModel.findByIdAndDelete(categoryId)
         if (!category) return res.json({ success: false, message: 'Category not found' })
+        // Delete associated image files
+        deleteImageFiles(category.image)
+        category.subCategories?.forEach((s) => deleteImageFiles(s.image))
         res.json({ success: true, message: 'Category deleted' })
     } catch (error) {
         console.error('removeCategory error:', error)
@@ -172,13 +184,11 @@ const addSubCategory = async (req, res) => {
         )
         if (dup) return res.json({ success: false, message: 'Sub-category already exists in this category' })
 
-        const imageUrl = await uploadImage(req.file)
-
         category.subCategories.push({
             name,
             slug:        toSlug(name),
             description: description || '',
-            image:       imageUrl,
+            image:       localImageUrl(req.file),
             isActive:    isActive !== undefined ? isActive === 'true' : true,
             sortOrder:   Number(sortOrder) || 0,
         })
@@ -210,7 +220,10 @@ const updateSubCategory = async (req, res) => {
         if (description !== undefined) sub.description = description
         if (sortOrder   !== undefined) sub.sortOrder   = Number(sortOrder)
         if (isActive    !== undefined) sub.isActive    = isActive === 'true'
-        if (req.file)                  sub.image       = await uploadImage(req.file)
+        if (req.file) {
+            deleteImageFiles(sub.image)
+            sub.image = localImageUrl(req.file)
+        }
 
         await category.save()
         res.json({ success: true, message: 'Sub-category updated', subCategory: sub })
@@ -229,6 +242,7 @@ const removeSubCategory = async (req, res) => {
         const category = await categoryModel.findById(categoryId)
         if (!category) return res.json({ success: false, message: 'Parent category not found' })
 
+        const removedSub = category.subCategories.id(subCategoryId)
         const before = category.subCategories.length
         category.subCategories = category.subCategories.filter(
             (s) => s._id.toString() !== subCategoryId
@@ -237,6 +251,8 @@ const removeSubCategory = async (req, res) => {
             return res.json({ success: false, message: 'Sub-category not found' })
 
         await category.save()
+        // Delete sub-category image file
+        if (removedSub) deleteImageFiles(removedSub.image)
         res.json({ success: true, message: 'Sub-category removed' })
     } catch (error) {
         console.error('removeSubCategory error:', error)

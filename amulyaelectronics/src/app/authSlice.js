@@ -1,53 +1,91 @@
 // src/app/authSlice.js
+// ─────────────────────────────────────────────────────────────────────────────
+//  ✅ googleLogin thunk added        POST /api/user/google  { idToken }
+//  ✅ fetchUserProfile               POST /api/user/profile  (header: token)
+//  ✅ updateUserProfile              POST /api/user/update-profile
+//  ✅ token header key fixed         backend reads req.headers.token (not Bearer)
+//  ✅ initialState hydrates token    from localStorage on page refresh
+//  ✅ logoutUser clears everything   incl. Google state
+//  ✅ All selectors exported
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import axios from 'axios'
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL
+const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000'
 
-// ✅ Backend reads req.headers.token — NOT Authorization: Bearer
+// ── Header helper — backend reads req.headers.token (NOT Authorization: Bearer)
 const authHeader = (token) => ({ token })
 
-// ─── Thunk: fetch profile ─────────────────────────────────────────────────────
-// ✅ GET /api/user/get-profile  (matches your backend route)
-// ✅ Response fields: data.userData, data.subscription
+// ─────────────────────────────────────────────────────────────────────────────
+// THUNK: Google Login
+// ─────────────────────────────────────────────────────────────────────────────
+// Call from Login component AFTER @react-oauth/google gives you a credential:
+//   const { credential } = googleResponse   // from useGoogleLogin or GoogleLogin
+//   dispatch(googleLogin(credential))
+// ─────────────────────────────────────────────────────────────────────────────
+export const googleLogin = createAsyncThunk(
+    'auth/googleLogin',
+    async (idToken, { rejectWithValue }) => {
+        try {
+            if (!idToken) return rejectWithValue('No Google ID token provided')
+
+            const { data } = await axios.post(`${API_BASE}/api/user/google`, { idToken })
+
+            if (!data.success) return rejectWithValue(data.message || 'Google login failed')
+
+            // Persist token so page-refresh doesn't log the user out
+            localStorage.setItem('amulya_token', data.token)
+            return { token: data.token }
+        } catch (err) {
+            return rejectWithValue(err.response?.data?.message || err.message || 'Google login failed')
+        }
+    }
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THUNK: Fetch User Profile
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/user/profile  (backend uses POST, passes userId via JWT)
+// Returns: { success, user }
+// ─────────────────────────────────────────────────────────────────────────────
 export const fetchUserProfile = createAsyncThunk(
     'auth/fetchUserProfile',
     async (_, { getState, rejectWithValue }) => {
         try {
             const token = getState().auth.token
-            if (!token) return rejectWithValue('No token')
+            if (!token) return rejectWithValue('No token — user not logged in')
 
             const { data } = await axios.post(
-                `${API_BASE}/api/user/profile`, {}, 
-                { headers: authHeader(token) }   // GET — no body, just headers
+                `${API_BASE}/api/user/profile`,
+                {},                                   // empty body — userId from JWT
+                { headers: authHeader(token) }
             )
 
-           // axios.post(`${API_BASE}/api/user/profile`, {}, { headers: { token } })
+            if (!data.success) return rejectWithValue(data.message)
 
-            
-            if (data.success) {
-                return {
-                    user:         data.user,      // ✅ matches your API: data.userData
-                    //subscription: data.subscription,  // ✅ matches your API: data.subscription
-                }
-            }
-            return rejectWithValue(data.message)
+            return { user: data.user }               // shape: { _id, name, email, … }
         } catch (err) {
             return rejectWithValue(err.response?.data?.message || err.message)
         }
     }
 )
 
-// ─── Thunk: update profile ────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// THUNK: Update User Profile
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /api/user/update-profile
-// Body: { name, phone, avatar } — userId comes from JWT, NOT body
+// Accepts any subset of { name, phone, avatar }
+// userId is read from JWT server-side — never sent in body
+// ─────────────────────────────────────────────────────────────────────────────
 export const updateUserProfile = createAsyncThunk(
     'auth/updateUserProfile',
-    async ({ name, phone, avatar }, { getState, rejectWithValue }) => {
+    async ({ name, phone, avatar } = {}, { getState, rejectWithValue }) => {
         try {
             const token = getState().auth.token
-            if (!token) return rejectWithValue('No token')
+            if (!token) return rejectWithValue('No token — user not logged in')
 
+            // Build body with only defined fields (don't overwrite with undefined)
             const body = {}
             if (name   !== undefined) body.name   = name
             if (phone  !== undefined) body.phone  = phone
@@ -60,53 +98,62 @@ export const updateUserProfile = createAsyncThunk(
             )
 
             if (!data.success) return rejectWithValue(data.message)
-            return { name, phone, avatar }
+
+            // Return the full updated user from backend so Redux stays in sync
+            return { user: data.user }
         } catch (err) {
             return rejectWithValue(err.response?.data?.message || err.message)
         }
     }
 )
 
-// ─── Slice ────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// SLICE
+// ─────────────────────────────────────────────────────────────────────────────
 const authSlice = createSlice({
     name: 'auth',
     initialState: {
-        token:         localStorage.getItem('token') || null,
-        isLoggedIn:    !!localStorage.getItem('token'),
+        // Hydrate from localStorage so refresh doesn't log user out
+        token:      localStorage.getItem('amulya_token') || null,
+        isLoggedIn: !!localStorage.getItem('amulya_token'),
 
-        user:          null,         // maps to data.userData from API
-        subscription:  null,         // maps to data.subscription from API
-        loading:       false,
-        error:         null,
+        user:          null,
+        loading:       false,     // fetchUserProfile / googleLogin in flight
+        error:         null,      // fetchUserProfile / googleLogin error
 
-        updating:      false,
+        updating:      false,     // updateUserProfile in flight
         updateError:   null,
         updateSuccess: false,
     },
 
     reducers: {
+        // ── Called by Login page after local email/password success ────────────
         loginSuccess(state, { payload }) {
             state.token      = payload.token
             state.isLoggedIn = true
             state.error      = null
-            localStorage.setItem('token', payload.token)
+            localStorage.setItem('amulya_token', payload.token)
         },
 
+        // ── Full logout — clears all auth state ───────────────────────────────
         logoutUser(state) {
             state.token         = null
             state.user          = null
-            state.subscription  = null
             state.isLoggedIn    = false
+            state.loading       = false
             state.error         = null
+            state.updating      = false
             state.updateError   = null
             state.updateSuccess = false
-            localStorage.removeItem('token')
+            localStorage.removeItem('amulya_token')
         },
 
+        // ── Optimistic partial user update (e.g. avatar preview) ──────────────
         setUser(state, { payload }) {
             state.user = state.user ? { ...state.user, ...payload } : payload
         },
 
+        // ── Clear transient messages (call on component unmount / tab switch) ──
         clearAuthMessages(state) {
             state.error         = null
             state.updateError   = null
@@ -115,40 +162,66 @@ const authSlice = createSlice({
     },
 
     extraReducers: (builder) => {
-        // fetchUserProfile
+        // ── googleLogin ────────────────────────────────────────────────────────
         builder
-            .addCase(fetchUserProfile.pending,   (s) => { s.loading = true; s.error = null })
-            .addCase(fetchUserProfile.fulfilled, (s, { payload }) => {
-                s.loading      = false
-                s.user         = payload.user          // data.userData
-                s.subscription = payload.subscription  // data.subscription
+            .addCase(googleLogin.pending, (state) => {
+                state.loading = true
+                state.error   = null
             })
-            .addCase(fetchUserProfile.rejected,  (s, { payload }) => { s.loading = false; s.error = payload })
+            .addCase(googleLogin.fulfilled, (state, { payload }) => {
+                state.loading    = false
+                state.token      = payload.token
+                state.isLoggedIn = true
+            })
+            .addCase(googleLogin.rejected, (state, { payload }) => {
+                state.loading = false
+                state.error   = payload
+            })
 
-        // updateUserProfile
+        // ── fetchUserProfile ───────────────────────────────────────────────────
         builder
-            .addCase(updateUserProfile.pending,   (s) => { s.updating = true; s.updateError = null; s.updateSuccess = false })
-            .addCase(updateUserProfile.fulfilled, (s, { payload }) => {
-                s.updating      = false
-                s.updateSuccess = true
-                if (s.user) {
-                    if (payload.name   !== undefined) s.user.name   = payload.name
-                    if (payload.phone  !== undefined) s.user.phone  = payload.phone
-                    if (payload.avatar !== undefined) s.user.avatar = payload.avatar
-                }
+            .addCase(fetchUserProfile.pending, (state) => {
+                state.loading = true
+                state.error   = null
             })
-            .addCase(updateUserProfile.rejected, (s, { payload }) => { s.updating = false; s.updateError = payload })
+            .addCase(fetchUserProfile.fulfilled, (state, { payload }) => {
+                state.loading = false
+                state.user    = payload.user
+            })
+            .addCase(fetchUserProfile.rejected, (state, { payload }) => {
+                state.loading = false
+                state.error   = payload
+            })
+
+        // ── updateUserProfile ──────────────────────────────────────────────────
+        builder
+            .addCase(updateUserProfile.pending, (state) => {
+                state.updating      = true
+                state.updateError   = null
+                state.updateSuccess = false
+            })
+            .addCase(updateUserProfile.fulfilled, (state, { payload }) => {
+                state.updating      = false
+                state.updateSuccess = true
+                // Replace full user object from backend (authoritative)
+                if (payload.user) state.user = payload.user
+            })
+            .addCase(updateUserProfile.rejected, (state, { payload }) => {
+                state.updating    = false
+                state.updateError = payload
+            })
     },
 })
 
 export const { loginSuccess, logoutUser, setUser, clearAuthMessages } = authSlice.actions
 export default authSlice.reducer
 
-// ─── Selectors ────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// SELECTORS
+// ─────────────────────────────────────────────────────────────────────────────
 export const selectToken          = (s) => s.auth.token
 export const selectIsLoggedIn     = (s) => s.auth.isLoggedIn
 export const selectUserProfile    = (s) => s.auth.user
-export const selectSubscription   = (s) => s.auth.subscription
 export const selectProfileLoading = (s) => s.auth.loading
 export const selectProfileError   = (s) => s.auth.error
 export const selectUpdating       = (s) => s.auth.updating

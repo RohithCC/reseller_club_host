@@ -228,8 +228,8 @@ const sections = [
         subtitle: 'Shipping Charges',
         text: 'Shipping charges are calculated at checkout based on your location and order value:',
         bullets: [
-          'Free delivery on orders above ₹499',
-          'Flat ₹49 delivery charge for orders below ₹499',
+          'Free delivery on orders above ₹999',
+          'Flat ₹49 delivery charge for orders below ₹999',
           'Additional charges may apply for remote areas',
           'Expedited delivery options may be available for select pin codes',
         ],
@@ -736,25 +736,7 @@ export default function TermsAndConditions() {
         </div>
       </div>
 
-      {/* ── NEWSLETTER STRIP ── */}
-      <div className="bg-gradient-to-r from-orange-500 to-orange-400 py-10 px-4">
-        <div className="max-w-2xl mx-auto text-center">
-          <h3 className="text-white font-black text-2xl mb-1">Subscribe for Deals & Updates</h3>
-          <p className="text-orange-100 text-sm mb-5">
-            Get 15% off your first order + exclusive offers straight to your inbox.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-            <input
-              type="email"
-              placeholder="Enter your email..."
-              className="flex-1 rounded-full px-5 py-3 text-sm outline-none border-2 border-transparent focus:border-white bg-white/90"
-            />
-            <button className="bg-white text-orange-500 font-black px-6 py-3 rounded-full hover:bg-orange-50 transition-all shadow-lg hover:scale-105 active:scale-95 whitespace-nowrap">
-              Subscribe →
-            </button>
-          </div>
-        </div>
-      </div>
+
     </div>
   )
 }

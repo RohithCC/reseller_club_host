@@ -16,6 +16,7 @@ import Contact        from './pages/Contact'
 import Product        from './pages/Product'
 import Cart           from './pages/Cart'
 import Checkout       from './pages/Checkout'
+import ErrorBoundary   from './components/ErrorBoundary'
 import Login          from './pages/Login'
 import PlaceOrder     from './pages/PlaceOrder'
 import Orders         from './pages/Orders'
@@ -32,10 +33,11 @@ import TermsAndConditions from './pages/TermsAndConditions'
 
 import Wishlist from './pages/Wishlist'
 
-// ── Layout ─────────────────────────────────────────────────────────────────────
-import Navbar from './components/Navbar'
-import Footer from './components/Footer'
-import Profile from './pages/Profile'
+// ── Components ────────────────────────────────────────────────────────────────
+import Navbar     from './components/Navbar'
+import CTASection from './components/CTASection'
+import Footer     from './components/Footer'
+import Profile    from './pages/Profile'
 
 const App = () => {
   const dispatch = useDispatch()
@@ -45,7 +47,7 @@ const App = () => {
     dispatch(fetchFooterSettings())
 
     // ✅ Restore user session on page refresh if token exists in localStorage
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('amulya_token')
     if (token) dispatch(fetchUserProfile())
   }, [dispatch])
 
@@ -70,13 +72,14 @@ const App = () => {
           <Route path="/"                     element={<Home />} />
           <Route path="/collection"           element={<Collection />} />
           <Route path="/collection/:category" element={<Collection />} />
+          <Route path="/collection/:category/:subCategory" element={<Collection />} />
           <Route path="/about"                element={<About />} />
           <Route path="/profile"                element={<Profile />} />
           <Route path="/contact"              element={<Contact />} />
           <Route path="/product/:productId"   element={<Product />} />
           <Route path="/cart"                 element={<Cart />} />
           <Route path="/wishlist" element={<Wishlist />} />
-          <Route path="/checkout"             element={<Checkout />} />
+          <Route path="/checkout"             element={<ErrorBoundary><Checkout /></ErrorBoundary>} />
           <Route path="/login"                element={<Login />} />
           <Route path="/place-order"          element={<PlaceOrder />} />
         
@@ -96,6 +99,9 @@ const App = () => {
         <Route path="/orders/:orderNumber" element={<OrderDetails />} />
         </Routes>
       </main>
+
+      {/* CTA Section — shown on every page before footer */}
+      <CTASection />
 
       {/* Footer reads live settings from Redux state.footer.settings */}
       <Footer />

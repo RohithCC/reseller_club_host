@@ -29,7 +29,7 @@ const productSchema = new mongoose.Schema(
     description:   { type: String, required: true },
     price:         { type: Number, required: true, min: 0 },
     originalPrice: { type: Number, default: 0 },      // MRP / strike-through price
-    image:         { type: [String], required: true }, // Cloudinary URLs
+    image:         { type: [String], required: true }, // /uploads/ paths
 
     // ── Categorisation ───────────────────────────────────────────────────────
     category:    { type: String, required: true, trim: true },
@@ -37,7 +37,6 @@ const productSchema = new mongoose.Schema(
 
     // ── Stock ────────────────────────────────────────────────────────────────
     inStock:    { type: Boolean, default: true },
-    stockCount: { type: Number,  default: 0, min: 0 },
 
     // ── Visibility / Badges ──────────────────────────────────────────────────
     bestseller: { type: Boolean, default: false },

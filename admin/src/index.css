@@ -3,17 +3,86 @@
 @tailwind components;
 @tailwind utilities;
 
-*{
-    font-family: Outfit;
+* {
+  font-family: Outfit;
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
 }
 
-select,input,textarea{
-    border: 1px solid #c2c2c2;
-    outline-color: #C586A5;
-    border-radius: 4px;
+select, input, textarea {
+  border: 1px solid #c2c2c2;
+  outline-color: #C586A5;
+  border-radius: 4px;
 }
 
-.active{
-    background-color: #ffebf5;
-    border-color: #C586A5;
+.active {
+  background-color: #ffebf5;
+  border-color: #C586A5;
+}
+
+/* ── Responsive & touch-friendly defaults ─────────────────────────────────── */
+
+/* Smooth scrolling on all browsers */
+html { scroll-behavior: smooth; }
+
+/* Prevent callout on long-press on iOS */
+body {
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
+
+/* Ensure buttons and interactive elements have minimum touch target */
+button, a, select, input, textarea, [role="button"], label {
+  touch-action: manipulation;
+}
+
+button, a, [role="button"] {
+  min-height: 36px;
+}
+
+/* Scrollable tables: wrap any <table> not inside .dash-scroll with a parent div */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrap table {
+  min-width: max-content;
+}
+
+/* Responsive breakpoint utilities */
+@media (max-width: 640px) {
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: block !important; }
+  
+  /* Slightly larger tap targets on mobile */
+  button, a, [role="button"] {
+    min-height: 40px;
+  }
+  
+  /* Smaller inputs on mobile */
+  select, input, textarea {
+    font-size: 16px !important; /* prevents iOS zoom on focus */
+  }
+}
+
+@media (min-width: 641px) {
+  .show-mobile { display: none !important; }
+}
+
+/* Recharts responsive containers should not overflow */
+.recharts-responsive-container,
+.recharts-wrapper {
+  max-width: 100% !important;
+}
+
+/* Toast notifications: better mobile positioning */
+@media (max-width: 640px) {
+  .Toastify__toast-container--top-right {
+    top: 8px !important;
+    right: 8px !important;
+    left: 8px !important;
+    width: auto !important;
+  }
 }

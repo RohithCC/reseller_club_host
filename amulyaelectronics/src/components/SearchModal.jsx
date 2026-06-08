@@ -39,6 +39,9 @@ import {
   selectCategories,
 } from '../app/searchSlice'
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000';
+const resolveUrl  = (path) => path?.startsWith('http') ? path : `${BACKEND_URL}${path}`;
+
 const QUICK_SEARCHES = [
   'Arduino Kit', 'Sensors', 'Voltmeter', 'Soldering Iron',
   'Battery', 'Motor Driver', 'Servo Motor', 'Relay Module',
@@ -65,7 +68,7 @@ function ResultCard({ product, onClose }) {
     >
       <div className="w-14 h-14 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
         <img
-          src={product.image || 'https://placehold.co/56x56?text=📦'}
+          src={resolveUrl(product.image) || 'https://placehold.co/56x56?text=📦'}
           alt={product.name}
           className="max-w-full max-h-full object-contain p-1"
           onError={(e) => { e.target.src = 'https://placehold.co/56x56?text=📦' }}
@@ -104,7 +107,7 @@ function SuggestionItem({ item, onSelect, isActive }) {
     >
       <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
         <img
-          src={item.image || 'https://placehold.co/32x32?text=📦'}
+          src={resolveUrl(item.image) || 'https://placehold.co/32x32?text=📦'}
           alt={item.name}
           className="max-w-full max-h-full object-contain"
           onError={(e) => { e.target.src = 'https://placehold.co/32x32?text=📦' }}

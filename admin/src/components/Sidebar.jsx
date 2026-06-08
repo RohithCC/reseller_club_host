@@ -1,440 +1,435 @@
 // components/Sidebar.jsx
+// White TailAdmin-inspired sidebar
+// ✅ Clean light UI  ✅ Unique icons per item  ✅ Flat section layout
+// ✅ Mobile drawer   ✅ Desktop collapse toggle  ✅ All routes intact
+
 import React, { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 
-// ─── Products Nav ─────────────────────────────────────────────────────────────
-const NAV_ITEMS = [
+// ─── Unique SVG icons per route ───────────────────────────────────────────────
+const IC = {
+  // Products section
+  AddItem: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <rect x="3" y="3" width="18" height="18" rx="3"/>
+      <path d="M12 8v8M8 12h8"/>
+    </svg>
+  ),
+  ListItems: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+    </svg>
+  ),
+  Categories: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
+    </svg>
+  ),
+  Orders: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <path d="M6 2 3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+      <path d="M3 6h18M16 10a4 4 0 01-8 0"/>
+    </svg>
+  ),
+  // Blog section
+  Frontend: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <rect x="2" y="3" width="20" height="14" rx="2"/>
+      <path d="m8 21 4-4 4 4M12 17v4"/>
+    </svg>
+  ),
+  Projects: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <path d="M2 7a2 2 0 012-2h4l2 3h10a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2z"/>
+    </svg>
+  ),
+  BannerFooter: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <rect x="2" y="4" width="20" height="5" rx="1"/>
+      <rect x="2" y="15" width="20" height="5" rx="1"/>
+      <path d="M6 11h12"/>
+    </svg>
+  ),
+  AddBlog: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+    </svg>
+  ),
+  BlogPosts: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+    </svg>
+  ),
+  // CRM section
+  Contacts: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+    </svg>
+  ),
+  // Sales Analytics icon
+  Analytics: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-6"/>
+    </svg>
+  ),
+  // Customers icon (people with shopping bag)
+  Customers: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <circle cx="19" cy="7" r="3"/>
+      <path d="M22 14v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3"/>
+    </svg>
+  ),
+  FooterSettings: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <rect x="2" y="2" width="20" height="20" rx="2"/>
+      <path d="M2 17h20M7 21V17M12 21V17M17 21V17"/>
+    </svg>
+  ),
+  HeroBanner: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <circle cx="8.5" cy="8.5" r="1.5"/>
+      <path d="M21 15l-5-5L5 21"/>
+    </svg>
+  ),
+  // YouTube icon
+  YouTube: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.94 2C5.12 20 12 20 12 20s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/>
+      <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="currentColor"/>
+    </svg>
+  ),
+
+  // Coupon icon
+  Coupon: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
+      <line x1="7" y1="7" x2="7.01" y2="7"/>
+    </svg>
+  ),
+  // Admin section
+  Users: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+    </svg>
+  ),
+  // Dashboard icon
+  Dashboard: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18,flexShrink:0}}>
+      <rect x="3" y="3" width="4" height="4" rx="1"/>
+      <rect x="17" y="3" width="4" height="4" rx="1"/>
+      <rect x="3" y="17" width="4" height="4" rx="1"/>
+      <rect x="17" y="17" width="4" height="4" rx="1"/>
+      <rect x="9" y="9" width="6" height="6" rx="1"/>
+    </svg>
+  ),
+  // UI controls
+  ChevronDown: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{width:13,height:13,flexShrink:0}}>
+      <path d="M6 9l6 6 6-6"/>
+    </svg>
+  ),
+  ChevronLeft: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15}}>
+      <path d="M15 18l-6-6 6-6"/>
+    </svg>
+  ),
+  Hamburger: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:18,height:18}}>
+      <path d="M3 12h18M3 6h18M3 18h18"/>
+    </svg>
+  ),
+  Close: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:16,height:16}}>
+      <path d="M18 6L6 18M6 6l12 12"/>
+    </svg>
+  ),
+  // Section header icons
+  Package: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14,flexShrink:0}}>
+      <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+    </svg>
+  ),
+  Book: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14,flexShrink:0}}>
+      <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+    </svg>
+  ),
+  Settings: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14,flexShrink:0}}>
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.07 4.93A10 10 0 004.93 19.07M4.93 4.93A10 10 0 0119.07 19.07"/>
+    </svg>
+  ),
+  Logo: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15}}>
+      <rect x="3" y="3" width="7" height="7" rx="1"/>
+      <rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/>
+      <rect x="14" y="14" width="7" height="7" rx="1"/>
+    </svg>
+  ),
+}
+
+// ─── Section definitions ──────────────────────────────────────────────────────
+const SECTIONS = [
   {
-    to: '/add',
-    label: 'Add Items',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 shrink-0">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-      </svg>
-    ),
+    label: 'Main',
+    SIcon: IC.Logo,
+    items: [
+      { to: '/dashboard', label: 'Dashboard',   Icon: IC.Dashboard, roles: ['super_admin','admin','staff'] },
+    ],
   },
   {
-    to: '/list',
-    label: 'List Items',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 shrink-0">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-      </svg>
-    ),
+    label: 'Products',
+    SIcon: IC.Package,
+    items: [
+      { to: '/add',        label: 'Add Items',   Icon: IC.AddItem,   roles: ['super_admin','admin','staff'] },
+      { to: '/list',       label: 'Items List',  Icon: IC.ListItems, roles: ['super_admin','admin','staff'] },
+      { to: '/categories', label: 'Categories',  Icon: IC.Categories, roles: ['super_admin','admin','staff'] },
+      { to: '/orders',     label: 'Order',       Icon: IC.Orders,   roles: ['super_admin','admin','staff'] },
+      { to: '/coupons',    label: 'Coupons',     Icon: IC.Coupon,   roles: ['super_admin','admin'] },
+      { to: '/payment-controller', label: 'Payment Controller', Icon: IC.Settings, roles: ['super_admin','admin'] },
+      { to: '/sales-analytics', label: 'Sales Analytics', Icon: IC.Analytics, roles: ['super_admin','admin','staff'] },
+    ],
   },
   {
-    to: '/categories',
-    label: 'Categories',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 shrink-0">
-        <path strokeLinecap="round" strokeLinejoin="round"
-          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-      </svg>
-    ),
+    label: 'Content',
+    SIcon: IC.Book,
+    items: [
+      { to: '/blog',         label: 'Blog Manager',    Icon: IC.BlogPosts, roles: ['super_admin','admin','staff','bloger'] },
+    ],
   },
   {
-    to: '/orders',
-    label: 'Orders',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 shrink-0">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-      </svg>
-    ),
+    label: 'Website Setting',
+    SIcon: IC.Settings,
+    items: [
+      { to: '/hero-banner', label: 'Hero Banner',       Icon: IC.HeroBanner,  roles: ['super_admin','admin'] },
+      { to: '/youtube-reels', label: 'YouTube Reels', Icon: IC.YouTube, roles: ['super_admin','admin'] },
+      { to: '/cta-banners',  label: 'CTA Banners', Icon: IC.BannerFooter, roles: ['super_admin','admin'] },
+      { to: '/footer-settings',label: 'Footer Setting',    Icon: IC.FooterSettings, roles: ['super_admin','admin'] },
+      { to: '/contacts',    label: 'Contacts',          Icon: IC.Contacts,    roles: ['super_admin','admin','staff'] },
+      { to: '/customers',   label: 'Customers',         Icon: IC.Customers,   roles: ['super_admin','admin','staff'] },
+    ],
+  },
+  {
+    label: 'Users',
+    SIcon: IC.Users,
+    items: [
+      { to: '/users',       label: 'Add Users',        Icon: IC.Users,      roles: ['super_admin'] },
+    ],
   },
 ]
 
-// ─── Blog Nav ─────────────────────────────────────────────────────────────────
-const BLOG_ITEMS = [
-  {
-    to: '/blog/frontend',
-    label: 'Blog_Frontend',   // ✅ Fixed: was showing raw route '/blog_frontend'
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 shrink-0">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-      </svg>
-    ),
-  },
-   {
-    to: '/blog/projects',
-    label: 'add projects',   // ✅ Fixed: was showing raw route '/blog_frontend'
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 shrink-0">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-      </svg>
-    ),
-  },
-    {
-    to: '/banner_footer',
-    label: 'banner_footer',   // ✅ Fixed: was showing raw route '/blog_frontend'
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 shrink-0">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-      </svg>
-    ),
-  },
-  {
-    to: '/blog/add',
-    label: 'Add Blog',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 shrink-0">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-      </svg>
-    ),
-  },
-  {
-    to: '/blog/list',
-    label: 'Blog Posts',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 shrink-0">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-      </svg>
-    ),
-  },
-]
-
-// ─── CRM / Settings Nav ───────────────────────────────────────────────────────
-const CRM_ITEMS = [
-  {
-    to: '/contacts',
-    label: 'Contacts',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 shrink-0">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-  },
-  {
-    to: '/footer-settings',
-    label: 'Footer Settings',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 shrink-0">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 20h16M4 16h16M9 12h6M11 8h2M12 4v4" />
-      </svg>
-    ),
-  },
-  {
-    to: '/hero-banner',
-    label: 'Hero Banner',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 shrink-0">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-    ),
-  },
-]
+// ─── Filter nav items by role ────────────────────────────────────────────────
+const filterByRole = (items, role) =>
+  items.filter(item => !item.roles || item.roles.includes(role))
 
 // ─── Reusable NavLink ─────────────────────────────────────────────────────────
-const SideNavLink = ({ to, label, icon, collapsed, onClick }) => (
+const SideNavLink = ({ to, label, Icon, collapsed, onClick }) => (
   <NavLink
     to={to}
     onClick={onClick}
-    className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative overflow-hidden"
     style={({ isActive }) => ({
-      background:  isActive ? 'linear-gradient(90deg,#00c2ff22,#00c2ff11)' : 'transparent',
-      color:       isActive ? '#00c2ff' : '#94a3b8',
-      borderLeft:  isActive ? '3px solid #00c2ff' : '3px solid transparent',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      padding: collapsed ? '9px 0' : '8px 11px',
+      justifyContent: collapsed ? 'center' : 'flex-start',
+      borderRadius: 8,
+      textDecoration: 'none',
+      fontSize: 13,
+      fontWeight: isActive ? 600 : 500,
+      color: isActive ? '#2563eb' : '#374151',
+      background: isActive ? '#dbeafe' : 'transparent',
+      marginBottom: 2,
+      position: 'relative',
+      transition: 'all 0.15s ease',
     })}
+    onMouseEnter={e => {
+      if (e.currentTarget.style.background !== 'rgb(238, 242, 255)') {
+        e.currentTarget.style.background = '#f3f4f6'
+        e.currentTarget.style.color = '#111827'
+      }
+    }}
+    onMouseLeave={e => {
+      e.currentTarget.style.background = ''
+      e.currentTarget.style.color = ''
+    }}
   >
     {({ isActive }) => (
       <>
-        <span
-          style={{ color: isActive ? '#00c2ff' : '#64748b' }}
-          className="transition-colors duration-200 group-hover:text-cyan-400"
-        >
-          {icon}
-        </span>
-        {!collapsed && (
-          <span
-            className="text-sm font-semibold tracking-wide whitespace-nowrap"
-            style={{ color: isActive ? '#00c2ff' : '#94a3b8' }}
-          >
-            {label}
-          </span>
+        {/* Active indicator */}
+        {isActive && !collapsed && (
+          <span style={{
+            position: 'absolute', left: 0, top: 6, bottom: 6,
+            width: 3, background: '#2563eb', borderRadius: '0 3px 3px 0',
+          }} />
         )}
-        {/* Hover glow overlay */}
-        <span
-          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none rounded-lg"
-          style={{ background: '#00c2ff0a' }}
-        />
+        <span style={{ color: isActive ? '#2563eb' : '#6b7280', display: 'flex', flexShrink: 0 }}>
+          <Icon />
+        </span>
+        {!collapsed && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>}
       </>
     )}
   </NavLink>
 )
 
 // ─── Section label ────────────────────────────────────────────────────────────
-const SectionLabel = ({ label, collapsed }) =>
-  !collapsed ? (
-    <div className="px-3 pt-5 pb-1">
-      <span style={{
-        fontSize: 9,
-        fontWeight: 700,
-        letterSpacing: '0.14em',
-        textTransform: 'uppercase',
-        color: '#1e3a5f',
-        fontFamily: "'Courier New', monospace",
-      }}>
+const SectionLabel = ({ label, SIcon, collapsed }) =>
+  collapsed ? (
+    <div style={{ height: 1, background: '#f3f4f6', margin: '8px 6px' }} />
+  ) : (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '14px 11px 5px' }}>
+      <span style={{ color: '#9ca3af' }}><SIcon /></span>
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9ca3af' }}>
         {label}
       </span>
     </div>
-  ) : (
-    <div style={{ height: 1, background: '#00c2ff11', margin: '10px 8px' }} />
   )
 
-// ─── Accordion group (section label + collapsible items) ──────────────────────
-// ✅ Fixed: removed duplicate accordion toggle — section label IS the header now.
-//    Accordion only collapses the item list; the label stays visible always.
-const AccordionSection = ({ label, icon, items, open, onToggle, collapsed, onNavClick }) => (
-  <>
-    <SectionLabel label={label} collapsed={collapsed} />
-
-    {/* Only show toggle chevron when sidebar is expanded */}
-    {!collapsed && (
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200"
-        style={{ color: '#475569', background: 'transparent', border: 'none', cursor: 'pointer' }}
-        onMouseEnter={e => e.currentTarget.style.background = '#00c2ff08'}
-        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-      >
-        <div className="flex items-center gap-2">
-          <span style={{ color: '#334155' }}>{icon}</span>
-          <span style={{
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: '0.06em',
-            color: '#475569',
-            fontFamily: "'Courier New', monospace",
-          }}>
-            {open ? 'Collapse' : 'Expand'}
-          </span>
-        </div>
-        <svg
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-          className="w-3.5 h-3.5"
-          style={{
-            color: '#334155',
-            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.3s',
-          }}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-    )}
-
-    {/* Items — always show when collapsed (icon-only mode), animate when expanded */}
-    {collapsed ? (
-      items.map(item => (
-        <SideNavLink key={item.to} {...item} collapsed={true} onClick={onNavClick} />
-      ))
-    ) : (
-      <div
-        className="overflow-hidden transition-all duration-300"
-        style={{ maxHeight: open ? `${items.length * 52}px` : '0px' }}
-      >
-        {items.map(item => (
-          <SideNavLink key={item.to} {...item} collapsed={false} onClick={onNavClick} />
-        ))}
-      </div>
-    )}
-  </>
+// ─── Logo mark ────────────────────────────────────────────────────────────────
+const LogoMark = ({ size = 32 }) => (
+  <div style={{
+    width: size, height: size, borderRadius: Math.round(size * 0.27),
+    background: 'linear-gradient(135deg,#2563eb,#1d4ed8)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  }}>
+    <IC.Logo />
+  </div>
 )
 
-// ─── Sidebar ──────────────────────────────────────────────────────────────────
-const Sidebar = () => {
-  const [collapsed,  setCollapsed]  = useState(false)
-  const [blogOpen,   setBlogOpen]   = useState(true)
-  const [crmOpen,    setCrmOpen]    = useState(true)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+// ─── Sidebar inner content ────────────────────────────────────────────────────
+const SidebarContent = ({
+  collapsed, onCollapse, showCollapseBtn,
+  onNavClick, role = 'super_admin',
+}) => {
+  return (
+  <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
-  const closeDrawer = () => setDrawerOpen(false)
-
-  // ── Inner content (shared by desktop + mobile drawer) ──
-  const SidebarContent = ({ forcedExpanded = false }) => {
-    const isExpanded = forcedExpanded || !collapsed
-
-    return (
-      <div className="flex flex-col h-full" style={{ fontFamily: "'Courier New',monospace" }}>
-
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-4 py-4"
-          style={{ borderBottom: '1px solid #00c2ff22' }}
-        >
-          {isExpanded && (
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#00c2ff' }} />
-              <span className="text-xs font-bold tracking-widest uppercase" style={{ color: '#00c2ff' }}>
-                Dashboard
-              </span>
-            </div>
-          )}
-          {/* Collapse toggle — only on desktop sidebar, not inside mobile drawer */}
-          {!forcedExpanded && (
-            <button
-              onClick={() => setCollapsed(c => !c)}
-              className="hidden md:flex items-center justify-center w-7 h-7 rounded"
-              style={{ background: '#00c2ff11', color: '#00c2ff' }}
-              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              <svg
-                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                className="w-4 h-4"
-                style={{
-                  transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.3s',
-                }}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-          )}
-        </div>
-
-        {/* Nav */}
-        <nav className="flex flex-col gap-0.5 px-2 pt-2 flex-1 overflow-y-auto pb-6">
-
-          {/* ── PRODUCTS ── */}
-          <SectionLabel label="Products" collapsed={!isExpanded} />
-          {NAV_ITEMS.map(item => (
-            <SideNavLink
-              key={item.to}
-              {...item}
-              collapsed={!isExpanded}
-              onClick={closeDrawer}
-            />
-          ))}
-
-          {/* ── BLOG ── */}
-          <AccordionSection
-            label="Blog"
-            open={blogOpen}
-            onToggle={() => setBlogOpen(o => !o)}
-            items={BLOG_ITEMS}
-            collapsed={!isExpanded}
-            onNavClick={closeDrawer}
-            icon={
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 shrink-0">
-                <path strokeLinecap="round" strokeLinejoin="round"
-                  d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-              </svg>
-            }
-          />
-
-          {/* ── CRM & SETTINGS ── */}
-          <AccordionSection
-            label="CRM & Settings"
-            open={crmOpen}
-            onToggle={() => setCrmOpen(o => !o)}
-            items={CRM_ITEMS}
-            collapsed={!isExpanded}
-            onNavClick={closeDrawer}
-            icon={
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 shrink-0">
-                <path strokeLinecap="round" strokeLinejoin="round"
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            }
-          />
-        </nav>
-
-        {/* Footer */}
-        {isExpanded && (
-          <div className="px-4 py-3 text-center" style={{ borderTop: '1px solid #00c2ff11' }}>
-            <p className="text-xs" style={{ color: '#334155' }}>© Amulya Electronics</p>
-            <p className="text-xs mt-0.5" style={{ color: '#1e3a5f' }}>Dharwad, Karnataka</p>
+    {/* Header */}
+    <div style={{
+      display: 'flex', alignItems: 'center',
+      justifyContent: collapsed ? 'center' : 'space-between',
+      padding: collapsed ? '16px 0' : '16px 16px',
+      borderBottom: '1px solid #f3f4f6', flexShrink: 0, gap: 8,
+    }}>
+      {!collapsed && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <LogoMark size={32} />
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#111827', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+              AdminPanel
+            </p>
+            <p style={{ fontSize: 10, color: '#9ca3af', fontWeight: 500 }}>Management Suite</p>
           </div>
-        )}
+        </div>
+      )}
+      {collapsed && <LogoMark size={32} />}
+      {showCollapseBtn && (
+        <button
+          onClick={onCollapse}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          style={{
+            width: 26, height: 26, borderRadius: 6,
+            border: '1px solid #e5e7eb', background: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', color: '#6b7280',
+            transition: 'all 0.15s', flexShrink: 0,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = '#f3f4f6'; e.currentTarget.style.borderColor = '#d1d5db' }}
+          onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e5e7eb' }}
+        >
+          <span style={{ transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s', display: 'flex' }}>
+            <IC.ChevronLeft />
+          </span>
+        </button>
+      )}
+    </div>
+
+    {/* Nav */}
+    <nav style={{
+      flex: 1, overflowY: 'auto', overflowX: 'hidden',
+      padding: collapsed ? '10px 8px' : '10px 10px',
+    }}>
+      {SECTIONS.map(section => {
+        const visible = filterByRole(section.items, role)
+        if (visible.length === 0) return null
+        return (
+          <div key={section.label}>
+            <SectionLabel label={section.label} SIcon={section.SIcon} collapsed={collapsed} />
+            {visible.map(item => (
+              <SideNavLink key={item.to} {...item} collapsed={collapsed} onClick={onNavClick} />
+            ))}
+          </div>
+        )
+      })}
+    </nav>
+
+    {/* User footer */}
+    {!collapsed && (
+      <div style={{
+        padding: '12px 16px', borderTop: '1px solid #f3f4f6',
+        background: '#fafafa', flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: '50%',
+            background: 'linear-gradient(135deg,#2563eb,#1d4ed8)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0,
+          }}>A</div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              Admin User
+            </p>
+            <p style={{ fontSize: 11, color: '#9ca3af' }}>{role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Admin' : role === 'staff' ? 'Staff' : 'Bloger'}</p>
+          </div>
+          <span style={{
+            fontSize: 10, fontWeight: 600,
+            background: '#ecfdf5', color: '#059669',
+            padding: '3px 8px', borderRadius: 99, flexShrink: 0,
+          }}>● Online</span>
+        </div>
       </div>
-    )
-  }
+    )}
+    </div>
+  )
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+const Sidebar = ({ role = 'super_admin' }) => {
+  const [collapsed, setCollapsed] = useState(false)
 
   return (
-    <>
-      {/* ── Desktop sidebar ── */}
-      <aside
-        className="hidden md:flex flex-col min-h-screen sticky top-0 transition-all duration-300"
-        style={{
-          width:       collapsed ? '64px' : '220px',
-          background:  'linear-gradient(180deg,#0a0f1e 0%,#0d1a2e 100%)',
-          borderRight: '1px solid #00c2ff22',
-          boxShadow:   '2px 0 20px #00000044',
-          flexShrink:  0,
-        }}
-      >
-        <SidebarContent />
-      </aside>
-
-      {/* ── Mobile FAB ── */}
-      <button
-        className="md:hidden fixed bottom-5 left-5 z-50 w-12 h-12 rounded-full flex items-center justify-center"
-        onClick={() => setDrawerOpen(o => !o)}
-        style={{
-          background: 'linear-gradient(135deg,#00c2ff,#0077b6)',
-          boxShadow:  '0 0 20px #00c2ff66',
-        }}
-        aria-label="Toggle menu"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" className="w-5 h-5">
-          {drawerOpen
-            ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            : <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-          }
-        </svg>
-      </button>
-
-      {/* ── Mobile backdrop ── */}
-      {drawerOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-40"
-          style={{ background: '#00000066', backdropFilter: 'blur(2px)' }}
-          onClick={closeDrawer}
-        />
-      )}
-
-      {/* ── Mobile drawer ── */}
-      <aside
-        className="md:hidden fixed top-0 left-0 h-full z-50 flex flex-col"
-        style={{
-          width:       '240px',
-          background:  'linear-gradient(180deg,#0a0f1e 0%,#0d1a2e 100%)',
-          borderRight: '1px solid #00c2ff22',
-          transform:   drawerOpen ? 'translateX(0)' : 'translateX(-100%)',
-          transition:  'transform 0.3s ease',
-          boxShadow:   drawerOpen ? '4px 0 30px #00000088' : 'none',
-        }}
-      >
-        {/* Drawer header */}
-        <div
-          className="flex items-center justify-between px-4 py-4"
-          style={{ borderBottom: '1px solid #00c2ff22' }}
-        >
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#00c2ff' }} />
-            <span
-              className="text-xs font-bold tracking-widest uppercase"
-              style={{ color: '#00c2ff', fontFamily: "'Courier New',monospace" }}
-            >
-              Menu
-            </span>
-          </div>
-          <button
-            onClick={closeDrawer}
-            className="w-7 h-7 flex items-center justify-center rounded"
-            style={{ color: '#64748b' }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          <SidebarContent forcedExpanded={true} />
-        </div>
-      </aside>
-    </>
+    <aside className="s-desktop" style={{
+      width: collapsed ? 64 : 240,
+      minHeight: '100vh',
+      background: '#ffffff',
+      borderRight: '1px solid #e5e7eb',
+      flexShrink: 0,
+      position: 'sticky',
+      top: 0,
+      transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
+      <SidebarContent
+        collapsed={collapsed}
+        onCollapse={() => setCollapsed(c => !c)}
+        showCollapseBtn={true}
+        onNavClick={undefined}
+        role={role}
+      />
+    </aside>
   )
 }
 

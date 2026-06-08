@@ -4,6 +4,15 @@ import axios from 'axios'
 import React, { useEffect, useState, useCallback } from 'react'
 import { backendUrl, currency } from '../App'
 import { toast } from 'react-toastify'
+import ToggleSwitch from '../components/ToggleSwitch'
+
+// ─── Image URL helper (prepend backend URL to relative paths) ──────────────────
+const imgUrl = (url) => {
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  if (url.startsWith('/uploads/')) return `${backendUrl}${url}`
+  return url
+}
 
 // Icon hint options — must match Add.jsx
 const ICON_OPTIONS = [
@@ -11,15 +20,7 @@ const ICON_OPTIONS = [
   'Automation', 'Learning', 'Sensor', 'Prototyping',
 ]
 
-// ── Small reusable toggle ─────────────────────────────────────────────────────
-const Toggle = ({ val, onToggle }) => (
-  <div onClick={onToggle}
-    className={`w-10 h-5 rounded-full cursor-pointer flex items-center px-0.5 transition-colors
-      ${val ? 'bg-blue-600' : 'bg-gray-300'}`}>
-    <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform
-      ${val ? 'translate-x-5' : 'translate-x-0'}`} />
-  </div>
-)
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
 const Badge = ({ label, color }) => {
@@ -37,6 +38,112 @@ const Badge = ({ label, color }) => {
   )
 }
 
+const validateImage = (file) => new Promise((resolve) => {
+  if (!file) return resolve(false)
+  const validTypes = ['image/webp', 'image/jpeg']
+  if (!validTypes.includes(file.type)) { toast.error('Only WebP and JPEG allowed'); return resolve(false) }
+  if (file.size > 204800) { toast.error('File size must be under 200 KB'); return resolve(false) }
+  const img = new Image()
+  img.onload = () => {
+    if (img.width !== 1200 || img.height !== 1200) { toast.error(`Must be exactly 1200×1200px (got ${img.width}×${img.height})`); URL.revokeObjectURL(img.src); return resolve(false) }
+    URL.revokeObjectURL(img.src); resolve(true)
+  }
+  img.onerror = () => { toast.error('Invalid image'); resolve(false) }
+  img.src = URL.createObjectURL(file)
+})
+
+// ── Pagination Component ──────────────────────────────────────────────────────
+const Pagination = ({ currentPage, totalPages, onPageChange, pageSize, onPageSizeChange, totalItems, shownItems }) => {
+  if (totalItems === 0) return null
+
+  const getPageNumbers = () => {
+    const pages = []
+    const delta = 2
+
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i)
+    } else {
+      pages.push(1)
+      if (currentPage > delta + 2) pages.push('...')
+      for (let i = Math.max(2, currentPage - delta); i <= Math.min(totalPages - 1, currentPage + delta); i++) {
+        pages.push(i)
+      }
+      if (currentPage < totalPages - delta - 1) pages.push('...')
+      pages.push(totalPages)
+    }
+    return pages
+  }
+
+  const startItem = (currentPage - 1) * pageSize + 1
+  const endItem   = Math.min(currentPage * pageSize, totalItems)
+
+  return (
+    <div className='flex flex-col sm:flex-row items-center justify-between gap-3 px-2 py-3 bg-gray-50 border border-gray-200 rounded-xl mt-2'>
+
+      {/* Left: count + page size */}
+      <div className='flex items-center gap-3 flex-wrap justify-center sm:justify-start'>
+        <span className='text-xs text-gray-500'>
+          Showing <span className='font-semibold text-gray-700'>{startItem}–{endItem}</span> of{' '}
+          <span className='font-semibold text-gray-700'>{totalItems}</span> products
+        </span>
+        <div className='flex items-center gap-1.5'>
+          <span className='text-xs text-gray-400'>Per page:</span>
+          <select
+            value={pageSize}
+            onChange={e => { onPageSizeChange(Number(e.target.value)); onPageChange(1) }}
+            className='border border-gray-300 rounded-md px-2 py-1 text-xs outline-none focus:border-blue-500 bg-white'
+          >
+            {PAGE_SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Right: page buttons */}
+      <div className='flex items-center gap-1'>
+        {/* Prev */}
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className='w-7 h-7 flex items-center justify-center rounded-lg border border-gray-300
+            text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white hover:border-blue-400
+            hover:text-blue-600 transition-colors text-xs font-bold'
+        >
+          ‹
+        </button>
+
+        {getPageNumbers().map((p, idx) =>
+          p === '...' ? (
+            <span key={`ellipsis-${idx}`} className='w-7 h-7 flex items-center justify-center text-gray-400 text-xs'>…</span>
+          ) : (
+            <button
+              key={p}
+              onClick={() => onPageChange(p)}
+              className={`w-7 h-7 flex items-center justify-center rounded-lg border text-xs font-semibold transition-colors
+                ${p === currentPage
+                  ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                  : 'border-gray-300 text-gray-600 hover:bg-white hover:border-blue-400 hover:text-blue-600'
+                }`}
+            >
+              {p}
+            </button>
+          )
+        )}
+
+        {/* Next */}
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className='w-7 h-7 flex items-center justify-center rounded-lg border border-gray-300
+            text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white hover:border-blue-400
+            hover:text-blue-600 transition-colors text-xs font-bold'
+        >
+          ›
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 const List = ({ token }) => {
 
@@ -50,9 +157,14 @@ const List = ({ token }) => {
   const [editLoading,   setEditLoading]   = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
 
+  // ── Pagination state ──────────────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize,    setPageSize]    = useState(10)
+
   // ── Category tree from API ────────────────────────────────────────────────
   const [categoryTree, setCategoryTree]   = useState([])
   const [catLoading,   setCatLoading]     = useState(true)
+
 
   // ── Edit form state ───────────────────────────────────────────────────────
   const [eName,       setEName]       = useState('')
@@ -77,6 +189,11 @@ const List = ({ token }) => {
 
   // ── "What You Can Do" use-case cards in edit modal ───────────────────────
   const [eUseCases, setEUseCases] = useState([{ label: '', desc: '', icon: 'Default' }])
+
+  // ── Reviews in edit modal ────────────────────────────────────────────────
+  const [eReviews,     setEReviews]     = useState([])
+  const [eRevLoading,  setERevLoading]  = useState(false)
+  const [eRevDeleting, setERevDeleting] = useState(null)
 
   // ── Derived: sub-options for selected category in edit modal ──────────────
   const editSubOptions = categoryTree.find(c => c.name === eCat)?.subCategories || []
@@ -113,6 +230,11 @@ const List = ({ token }) => {
     fetchList()
     fetchCategoryTree()
   }, [fetchList, fetchCategoryTree])
+
+  // Reset to page 1 whenever filters/sort/search change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, filterCat, sortBy])
 
   // ── Delete ────────────────────────────────────────────────────────────────
   const removeProduct = async (id) => {
@@ -180,8 +302,6 @@ const List = ({ token }) => {
     setETags(p.tags?.length ? p.tags.map(t => t.replace(/^#/, '')) : [''])
     setEImages([false, false, false, false])
 
-    // ── Restore use-case cards ──────────────────────────────────────────────
-    // If the product has stored useCases use them; otherwise start with one blank card
     setEUseCases(
       p.useCases?.length
         ? p.useCases.map(uc => ({
@@ -192,7 +312,6 @@ const List = ({ token }) => {
         : [{ label: '', desc: '', icon: 'Default' }]
     )
 
-    // ── Category ─────────────────────────────────────────────────────────────
     const matchedCat = categoryTree.find(c => c.name === p.category)
     const catName    = matchedCat ? matchedCat.name : (p.category || '')
     setECat(catName)
@@ -200,9 +319,19 @@ const List = ({ token }) => {
     const subs       = matchedCat?.subCategories || []
     const matchedSub = subs.find(s => s.name === p.subCategory)
     setESub(matchedSub ? matchedSub.name : (p.subCategory || ''))
+
+    // Fetch full product with reviews
+    ;(async () => {
+      setERevLoading(true)
+      try {
+        const { data } = await axios.post(`${backendUrl}/api/product/single`, { productId: p._id })
+        if (data.success) setEReviews(data.product.reviews || [])
+        else setEReviews([])
+      } catch { setEReviews([]) }
+      finally { setERevLoading(false) }
+    })()
   }
 
-  // When eCat changes inside the edit modal, reset eSub to first available sub
   const handleEditCatChange = (newCat) => {
     setECat(newCat)
     const subs = categoryTree.find(c => c.name === newCat)?.subCategories || []
@@ -244,7 +373,6 @@ const List = ({ token }) => {
         if (k.trim() && eSpecVal[i]?.trim()) specs[k.trim()] = eSpecVal[i].trim()
       })
 
-      // Only persist use-case cards that have a label
       const cleanUseCases = eUseCases.filter(uc => uc.label.trim())
 
       formData.append('keyFeatures',    JSON.stringify(eFeatures.filter(f => f.trim())))
@@ -273,6 +401,23 @@ const List = ({ token }) => {
     }
   }
 
+  // ── Delete review ─────────────────────────────────────────────────────────
+  const handleDeleteReview = async (reviewId) => {
+    if (!confirm('Delete this review?')) return
+    setERevDeleting(reviewId)
+    try {
+      const { data } = await axios.post(`${backendUrl}/api/product/delete-review`,
+        { productId: editProduct._id, reviewId },
+        { headers: { token } }
+      )
+      if (data.success) {
+        toast.success('Review deleted')
+        setEReviews(prev => prev.filter(r => r._id !== reviewId))
+      } else toast.error(data.message)
+    } catch { toast.error('Failed to delete review') }
+    finally { setERevDeleting(null) }
+  }
+
   // ── List helpers ──────────────────────────────────────────────────────────
   const updateList = (setter, arr, i, v) => { const n = [...arr]; n[i] = v; setter(n) }
   const addItem    = (setter, arr)        => setter([...arr, ''])
@@ -286,8 +431,8 @@ const List = ({ token }) => {
     ? categoryTree.map(c => c.name)
     : [...new Set(list.map(p => p.category).filter(Boolean))]
 
-  // ── Filtered + sorted list ────────────────────────────────────────────────
-  const displayed = list
+  // ── Filtered + sorted list (ALL matching items) ───────────────────────────
+  const filtered = list
     .filter(p => {
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase())
       const matchCat    = filterCat === 'All' || p.category === filterCat
@@ -301,6 +446,13 @@ const List = ({ token }) => {
       return b.date - a.date
     })
 
+  // ── Pagination calculations ───────────────────────────────────────────────
+  const totalItems  = filtered.length
+  const totalPages  = Math.max(1, Math.ceil(totalItems / pageSize))
+  const safePage    = Math.min(currentPage, totalPages)
+  const startIdx    = (safePage - 1) * pageSize
+  const displayed   = filtered.slice(startIdx, startIdx + pageSize)
+
   const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 bg-white'
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -311,7 +463,10 @@ const List = ({ token }) => {
       <div className='flex items-center justify-between flex-wrap gap-3'>
         <div>
           <h2 className='text-xl font-bold text-gray-800'>All Products</h2>
-          <p className='text-sm text-gray-500'>{list.length} products total · {displayed.length} shown</p>
+          <p className='text-sm text-gray-500'>
+            {list.length} products total · {totalItems} shown
+            {totalItems !== list.length ? ` (filtered)` : ''}
+          </p>
         </div>
       </div>
 
@@ -320,11 +475,11 @@ const List = ({ token }) => {
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder='Search products...'
-          className='border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 w-64'
+          className='border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 w-full sm:w-64'
         />
 
         <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
-          className='border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500'>
+          className='border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 flex-1 sm:flex-none'>
           <option value='All'>All Categories</option>
           {catLoading
             ? <option disabled>Loading...</option>
@@ -333,7 +488,7 @@ const List = ({ token }) => {
         </select>
 
         <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-          className='border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500'>
+          className='border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 flex-1 sm:flex-none'>
           <option value='date'>Newest First</option>
           <option value='price_asc'>Price: Low → High</option>
           <option value='price_desc'>Price: High → Low</option>
@@ -364,14 +519,14 @@ const List = ({ token }) => {
           const disc = discount(item)
           return (
             <div key={item._id}
-              className='grid grid-cols-[80px_1fr] md:grid-cols-[80px_2fr_1fr_120px_100px_80px_110px]
-                items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl
+              className='grid grid-cols-[64px_1fr] md:grid-cols-[80px_2fr_1fr_120px_100px_80px_110px]
+                items-center gap-3 px-3 sm:px-4 py-3 bg-white border border-gray-200 rounded-xl
                 hover:shadow-sm transition-shadow'>
 
               {/* Image */}
               <div className='relative'>
-                <img src={item.image[0]} alt={item.name}
-                  className='w-16 h-16 object-cover rounded-lg border border-gray-100' />
+                <img src={imgUrl(item.image[0])} alt={item.name}
+                  className='w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg border border-gray-100' />
                 {disc > 0 &&
                   <span className='absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold
                     px-1 py-0.5 rounded-full'>-{disc}%</span>}
@@ -383,6 +538,16 @@ const List = ({ token }) => {
                 <p className='text-xs text-blue-500 font-medium truncate mb-1'>
                   {item.subCategory || '—'}
                 </p>
+                {/* Mobile: price + stock row */}
+                <div className='flex md:hidden items-center gap-2 mb-1 flex-wrap'>
+                  <span className='text-xs font-bold text-gray-800'>{currency}{item.price}</span>
+                  {item.originalPrice > item.price &&
+                    <span className='text-xs text-gray-400 line-through'>{currency}{item.originalPrice}</span>}
+                  <span className={`text-[10px] font-semibold ${item.inStock ? 'text-green-600' : 'text-red-500'}`}>
+                    · {item.inStock ? 'In Stock' : 'Out'}
+                  </span>
+                  <span className='text-[10px] text-gray-400'>· {item.stockCount ?? 0} units</span>
+                </div>
                 <div className='flex flex-wrap gap-1'>
                   {item.bestseller && <Badge label='⭐ Bestseller' color='yellow' />}
                   {item.isHot      && <Badge label='🔥 HOT'        color='red'    />}
@@ -394,6 +559,17 @@ const List = ({ token }) => {
                   {item.tags?.slice(0, 2).map(t => (
                     <span key={t} className='text-[10px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded-full'>{t}</span>
                   ))}
+                </div>
+                {/* Mobile: actions */}
+                <div className='flex md:hidden items-center gap-2 mt-2'>
+                  <button onClick={() => openEdit(item)}
+                    className='px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors text-xs font-medium'>
+                    ✏️ Edit
+                  </button>
+                  <button onClick={() => setDeleteConfirm(item._id)}
+                    className='px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg transition-colors text-xs font-medium'>
+                    🗑 Delete
+                  </button>
                 </div>
               </div>
 
@@ -412,12 +588,11 @@ const List = ({ token }) => {
 
               {/* Stock toggle */}
               <div className='hidden md:flex flex-col gap-1 items-start'>
-                <Toggle val={item.inStock} onToggle={() => toggleStock(item._id, item.inStock)} />
+                <ToggleSwitch val={item.inStock} onToggle={() => toggleStock(item._id, item.inStock)} />
                 <span className={`text-[10px] font-medium ${item.inStock ? 'text-green-600' : 'text-red-500'}`}>
                   {item.inStock ? 'In Stock' : 'Out'}
                 </span>
-                {item.stockCount > 0 &&
-                  <span className='text-[10px] text-gray-400'>{item.stockCount} units</span>}
+                <span className='text-[10px] text-gray-400'>{item.stockCount ?? 0} units</span>
               </div>
 
               {/* Rating */}
@@ -432,8 +607,8 @@ const List = ({ token }) => {
                 )}
               </div>
 
-              {/* Actions */}
-              <div className='flex items-center gap-2 md:justify-center'>
+              {/* Actions (desktop) */}
+              <div className='hidden md:flex items-center gap-2 justify-center'>
                 <button onClick={() => openEdit(item)}
                   className='p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors text-sm font-medium'>
                   ✏️ Edit
@@ -447,6 +622,19 @@ const List = ({ token }) => {
             </div>
           )
         })
+      )}
+
+      {/* ── Pagination ── */}
+      {!loading && totalItems > 0 && (
+        <Pagination
+          currentPage={safePage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+          totalItems={totalItems}
+          shownItems={displayed.length}
+        />
       )}
 
       {/* ══ DELETE CONFIRM MODAL ═════════════════════════════════════════════ */}
@@ -487,7 +675,7 @@ const List = ({ token }) => {
               {/* Replace images */}
               <div>
                 <p className='mb-1 font-semibold text-gray-700 text-sm'>Replace Images (optional)</p>
-                <div className='flex gap-3'>
+                <div className='flex flex-wrap gap-3'>
                   {editProduct.image.concat(['', '', '']).slice(0, 4).map((src, i) => (
                     <label key={i} htmlFor={`eimg${i}`} className='cursor-pointer'>
                       <div className='w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg overflow-hidden
@@ -495,7 +683,7 @@ const List = ({ token }) => {
                         {eImages[i]
                           ? <img src={URL.createObjectURL(eImages[i])} className='w-full h-full object-cover' alt='' />
                           : src
-                            ? <img src={src} className='w-full h-full object-cover' alt='' />
+                            ? <img src={imgUrl(src)} className='w-full h-full object-cover' alt='' />
                             : <span className='text-gray-300 text-2xl'>+</span>
                         }
                         {eImages[i] &&
@@ -503,10 +691,8 @@ const List = ({ token }) => {
                             <span className='text-blue-600 text-[10px] font-bold'>NEW</span>
                           </div>}
                       </div>
-                      <input type='file' id={`eimg${i}`} hidden accept='image/*'
-                        onChange={e => {
-                          const n = [...eImages]; n[i] = e.target.files[0]; setEImages(n)
-                        }} />
+                      <input type='file' id={`eimg${i}`} hidden accept='image/webp,image/jpeg'
+                        onChange={async e => { const f = e.target.files[0]; if (f) { const ok = await validateImage(f); if (ok) { const n = [...eImages]; n[i] = f; setEImages(n) } else e.target.value = '' } }} />
                     </label>
                   ))}
                 </div>
@@ -620,8 +806,8 @@ const List = ({ token }) => {
                     { label: '✅ In Stock',   val: eInStock,    set: setEInStock    },
                   ].map(({ label, val, set }) => (
                     <label key={label} className='flex items-center gap-2 cursor-pointer select-none'>
-                      <Toggle val={val} onToggle={() => set(p => !p)} />
-                      <span className={`text-xs font-medium ${val ? 'text-blue-600' : 'text-gray-400'}`}>{label}</span>
+                      <ToggleSwitch val={val} onToggle={() => set(p => !p)} label={label} />
+                      
                     </label>
                   ))}
                 </div>
@@ -685,7 +871,6 @@ const List = ({ token }) => {
                     <div key={i}
                       className='border border-gray-200 rounded-xl p-4 bg-gray-50 hover:border-blue-300 transition-colors'>
 
-                      {/* Card header */}
                       <div className='flex items-center justify-between mb-3'>
                         <span className='text-xs font-bold text-gray-400 uppercase tracking-wider'>
                           Use Case {i + 1}
@@ -700,9 +885,8 @@ const List = ({ token }) => {
                       </div>
 
                       <div className='grid gap-3'>
-                        {/* Label + Icon */}
-                        <div className='flex gap-2'>
-                          <div className='flex-1'>
+                        <div className='flex flex-wrap gap-2'>
+                          <div className='flex-1 min-w-[160px]'>
                             <label className='text-xs font-semibold text-gray-500 block mb-1'>
                               Title / Label <span className='text-red-400'>*</span>
                             </label>
@@ -726,7 +910,6 @@ const List = ({ token }) => {
                           </div>
                         </div>
 
-                        {/* Description */}
                         <div>
                           <label className='text-xs font-semibold text-gray-500 block mb-1'>
                             Short Description
@@ -739,9 +922,8 @@ const List = ({ token }) => {
                           />
                         </div>
 
-                        {/* Preview pill */}
                         {uc.label.trim() && (
-                          <div className='flex items-center gap-2'>
+                          <div className='flex flex-wrap items-center gap-2'>
                             <span className='text-xs text-gray-400'>Preview:</span>
                             <span className='inline-flex items-center gap-1.5 bg-white border border-blue-200
                               text-blue-700 text-xs font-semibold px-3 py-1 rounded-full'>
@@ -787,6 +969,42 @@ const List = ({ token }) => {
                     + Tag
                   </button>
                 </div>
+              </div>
+
+              {/* ── Reviews ── */}
+              <div className='border-t pt-4'>
+                <div className='flex items-center gap-2 mb-3'>
+                  <p className='text-sm font-bold text-gray-700'>Reviews</p>
+                  {eRevLoading && <span className='text-xs text-gray-400'>Loading...</span>}
+                  {!eRevLoading && <span className='text-xs text-gray-400'>({eReviews.length})</span>}
+                </div>
+                {eRevLoading ? (
+                  <div className='text-xs text-gray-400 py-4 text-center'>Loading reviews...</div>
+                ) : eReviews.length === 0 ? (
+                  <div className='text-xs text-gray-400 py-4 text-center italic'>No reviews yet</div>
+                ) : (
+                  <div className='max-h-60 overflow-y-auto space-y-2'>
+                    {eReviews.map(r => (
+                      <div key={r._id} className='flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100'>
+                        <div className='w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5'>
+                          {(r.userName || r.name || 'A')[0].toUpperCase()}
+                        </div>
+                        <div className='flex-1 min-w-0'>
+                          <div className='flex items-center gap-2 flex-wrap'>
+                            <span className='text-xs font-bold text-gray-700'>{r.userName || r.name || 'Anonymous'}</span>
+                            <span className='text-[11px] text-yellow-500 font-bold'>★ {r.rating}</span>
+                            <span className='text-[10px] text-gray-400'>{new Date(r.date || r.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <p className='text-xs text-gray-600 mt-0.5'>{r.comment}</p>
+                        </div>
+                        <button type='button' onClick={() => handleDeleteReview(r._id)} disabled={eRevDeleting === r._id}
+                          className='text-red-400 hover:text-red-600 text-xs font-bold flex-shrink-0 px-2 py-1 rounded hover:bg-red-50 transition-colors disabled:opacity-40'>
+                          {eRevDeleting === r._id ? '...' : 'Delete'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Modal footer */}

@@ -129,12 +129,152 @@ export const deleteCoupon = async (req, res) => {
   }
 };
 
+// ── GET /api/coupons/admin ──────────────────────────────────────────
+// List all coupons for admin with full details
+export const adminListCoupons = async (req, res) => {
+  try {
+    const coupons = await Coupon.find()
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const now = new Date();
+    const enriched = coupons.map(c => ({
+      ...c,
+      isExpired: now > c.validTill,
+      isExpiringSoon: c.validTill && !c.isExpired && (c.validTill - now) / (1000 * 60 * 60 * 24) <= 7,
+      usagePercent: c.usageLimit ? Math.round((c.usedCount / c.usageLimit) * 100) : null,
+      uniqueUsers: new Set(c.usedBy?.map(u => u.userId?.toString()) || []).size,
+    }))
+
+    res.json({ success: true, coupons: enriched });
+  } catch (err) {
+    console.error("adminListCoupons:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch coupons" });
+  }
+};
+
+// ── GET /api/coupons/:id/usage ──────────────────────────────────────
+// Return usage details for a specific coupon
+export const getCouponUsage = async (req, res) => {
+  try {
+    const coupon = await Coupon.findById(req.params.id)
+      .select("code usedBy usedCount usageLimit")
+      .lean();
+
+    if (!coupon) {
+      return res.status(404).json({ success: false, message: "Coupon not found." });
+    }
+
+    res.json({
+      success: true,
+      couponCode: coupon.code,
+      usedCount: coupon.usedCount,
+      usageLimit: coupon.usageLimit,
+      usedBy: (coupon.usedBy || []).sort((a, b) => new Date(b.usedAt) - new Date(a.usedAt)),
+    });
+  } catch (err) {
+    console.error("getCouponUsage:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch usage details" });
+  }
+};
+
+// ── POST /api/coupons/bulk-generate ─────────────────────────────────
+// Generate multiple coupon codes at once
+export const bulkGenerateCoupons = async (req, res) => {
+  try {
+    const { count = 10, prefix = "CAMPAIGN", template } = req.body;
+
+    if (!template) {
+      return res.status(400).json({ success: false, message: "Template config is required (type, value, validTill, etc.)" });
+    }
+
+    const maxCount = Math.min(count, 500);
+    const codes = [];
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
+
+    const generateCode = () => {
+      let code = prefix.toUpperCase();
+      for (let i = 0; i < 6; i++) {
+        code += chars[Math.floor(Math.random() * chars.length)];
+      }
+      return code;
+    };
+
+    // Generate unique codes
+    while (codes.length < maxCount) {
+      const code = generateCode();
+      const exists = await Coupon.findOne({ code });
+      if (!exists && !codes.includes(code)) {
+        codes.push(code);
+      }
+    }
+
+    // Create coupons
+    const couponsData = codes.map(code => ({
+      ...template,
+      code,
+      label: template.label || `${prefix} Campaign`,
+      isActive: true,
+    }));
+
+    const created = await Coupon.insertMany(couponsData, { ordered: false });
+
+    res.status(201).json({
+      success: true,
+      message: `${created.length} coupons generated with prefix "${prefix}"`,
+      count: created.length,
+      sampleCodes: created.slice(0, 5).map(c => c.code),
+    });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({ success: false, message: "Some codes conflicted. Try a different prefix." });
+    }
+    console.error("bulkGenerateCoupons:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── GET /api/coupons/expiring-soon ──────────────────────────────────
+// Coupons expiring within 7 days (for dashboard/notifications)
+export const getExpiringCoupons = async (req, res) => {
+  try {
+    const now = new Date();
+    const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const coupons = await Coupon.find({
+      isActive: true,
+      validTill: { $gte: now, $lte: sevenDaysLater },
+    })
+      .select("code label validTill usedCount usageLimit")
+      .sort({ validTill: 1 })
+      .lean();
+
+    res.json({ success: true, coupons });
+  } catch (err) {
+    console.error("getExpiringCoupons:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch expiring coupons" });
+  }
+};
+
 // ── Internal helper for Order controller — atomically increments usedCount
-export const incrementCouponUsage = async (code) => {
+//    and tracks per-customer usage
+export const incrementCouponUsage = async (code, userInfo = {}) => {
   if (!code) return null;
+  const { userId, email, orderId } = userInfo;
+  const update = { $inc: { usedCount: 1 } };
+  if (userId || email) {
+    update.$push = {
+      usedBy: {
+        ...(userId  ? { userId }  : {}),
+        ...(email   ? { email }   : {}),
+        ...(orderId ? { orderId } : {}),
+        usedAt: new Date(),
+      },
+    };
+  }
   return Coupon.findOneAndUpdate(
     { code: code.toUpperCase() },
-    { $inc: { usedCount: 1 } },
+    update,
     { new: true }
   );
 };

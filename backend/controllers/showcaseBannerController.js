@@ -5,6 +5,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import showcaseBannerModel from '../models/showcaseBannerModel.js'
+import fs   from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const UPLOADS   = path.join(__dirname, '..', 'uploads')
+
+const deleteFile = (filePath) => {
+  if (!filePath || filePath.startsWith('http')) return
+  const full = path.join(UPLOADS, path.basename(filePath))
+  if (fs.existsSync(full)) fs.unlinkSync(full)
+}
 
 // ─── PUBLIC ───────────────────────────────────────────────────────────────────
 
@@ -44,13 +56,25 @@ const getAllBanners = async (req, res) => {
 }
 
 // POST /api/showcase/admin/banners
-// Body: { title, subtitle, cta, link, image, overlay, order, isActive }
+// Accepts both JSON body fields and multipart file uploads (image, imageMobile)
 const createBanner = async (req, res) => {
   try {
-    const { title, subtitle, cta, link, image, overlay, order, isActive } = req.body
+    const { title, subtitle, cta, link, image, imageMobile, overlay, order, isActive, bgColor, description, buttons } = req.body
 
-    if (!title?.trim() || !subtitle?.trim() || !link?.trim() || !image?.trim()) {
-      return res.json({ success: false, message: 'title, subtitle, link and image are required.' })
+    // Handle uploaded files — file path takes priority over URL text field
+    let imagePath = image?.trim() || ''
+    let mobilePath = imageMobile?.trim() || ''
+    if (req.files) {
+      if (req.files.image && req.files.image[0]) {
+        imagePath = '/uploads/' + req.files.image[0].filename
+      }
+      if (req.files.imageMobile && req.files.imageMobile[0]) {
+        mobilePath = '/uploads/' + req.files.imageMobile[0].filename
+      }
+    }
+
+    if (!title?.trim() || !imagePath) {
+      return res.json({ success: false, message: 'Title and desktop image are required.' })
     }
 
     // Auto-assign order to end of list if not provided
@@ -60,15 +84,25 @@ const createBanner = async (req, res) => {
       .select('order')
       .lean()
 
+    // Parse buttons JSON if string (from FormData)
+    let parsedButtons = buttons
+    if (typeof buttons === 'string') {
+      try { parsedButtons = JSON.parse(buttons) } catch { parsedButtons = [] }
+    }
+
     const banner = new showcaseBannerModel({
-      title:    title.trim(),
-      subtitle: subtitle.trim(),
-      cta:      (cta || 'Shop Now').trim(),
-      link:     link.trim(),
-      image:    image.trim(),
-      overlay:  (overlay || 'from-slate-900/85 via-slate-900/50 to-transparent').trim(),
-      order:    order !== undefined ? Number(order) : (lastBanner?.order ?? 0) + 1,
-      isActive: isActive !== undefined ? Boolean(isActive) : true,
+      title:       title.trim(),
+      subtitle:    (subtitle || '').trim(),
+      cta:         (cta || 'Shop Now').trim(),
+      link:        (link || '').trim(),
+      bgColor:     bgColor?.trim() || 'bg-white',
+      description: description?.trim() || '',
+      buttons:     Array.isArray(parsedButtons) ? parsedButtons : [],
+      image:       imagePath,
+      imageMobile: mobilePath,
+      overlay:     (overlay || 'from-slate-900/85 via-slate-900/50 to-transparent').trim(),
+      order:       order !== undefined ? Number(order) : (lastBanner?.order ?? 0) + 1,
+      isActive:    isActive !== undefined ? Boolean(isActive) : true,
     })
 
     await banner.save()
@@ -80,21 +114,43 @@ const createBanner = async (req, res) => {
 }
 
 // PUT /api/showcase/admin/banners/:id
-// Body: any subset of banner fields — only provided fields are updated
+// Accepts both JSON body fields and multipart file uploads (image, imageMobile)
 const updateBanner = async (req, res) => {
   try {
     const { id } = req.params
-    const { title, subtitle, cta, link, image, overlay, order, isActive } = req.body
+    const { title, subtitle, cta, link, image, imageMobile, overlay, order, isActive, bgColor, description, buttons } = req.body
+
+    // Handle uploaded files — file path takes priority over URL text field
+    let imagePath = image?.trim()
+    let mobilePath = imageMobile?.trim()
+    if (req.files) {
+      if (req.files.image && req.files.image[0]) {
+        imagePath = '/uploads/' + req.files.image[0].filename
+      }
+      if (req.files.imageMobile && req.files.imageMobile[0]) {
+        mobilePath = '/uploads/' + req.files.imageMobile[0].filename
+      }
+    }
+
+    // Parse buttons JSON if string (from FormData)
+    let parsedButtons = buttons
+    if (typeof buttons === 'string') {
+      try { parsedButtons = JSON.parse(buttons) } catch { parsedButtons = undefined }
+    }
 
     const updates = {}
-    if (title    !== undefined) updates.title    = title.trim()
-    if (subtitle !== undefined) updates.subtitle = subtitle.trim()
-    if (cta      !== undefined) updates.cta      = cta.trim()
-    if (link     !== undefined) updates.link     = link.trim()
-    if (image    !== undefined) updates.image    = image.trim()
-    if (overlay  !== undefined) updates.overlay  = overlay.trim()
-    if (order    !== undefined) updates.order    = Number(order)
-    if (isActive !== undefined) updates.isActive = Boolean(isActive)
+    if (title       !== undefined) updates.title       = title.trim()
+    if (subtitle    !== undefined) updates.subtitle    = subtitle.trim()
+    if (cta         !== undefined) updates.cta         = cta.trim()
+    if (link        !== undefined) updates.link        = link.trim()
+    if (bgColor     !== undefined) updates.bgColor     = bgColor.trim()
+    if (description !== undefined) updates.description = description.trim()
+    if (parsedButtons !== undefined) updates.buttons   = parsedButtons
+    if (imagePath   !== undefined) updates.image       = imagePath
+    if (mobilePath  !== undefined) updates.imageMobile = mobilePath
+    if (overlay     !== undefined) updates.overlay     = overlay.trim()
+    if (order       !== undefined) updates.order       = Number(order)
+    if (isActive    !== undefined) updates.isActive    = Boolean(isActive)
 
     const banner = await showcaseBannerModel.findByIdAndUpdate(
       id,
@@ -116,6 +172,8 @@ const deleteBanner = async (req, res) => {
     const { id } = req.params
     const banner = await showcaseBannerModel.findByIdAndDelete(id)
     if (!banner) return res.json({ success: false, message: 'Banner not found' })
+    deleteFile(banner.image)
+    deleteFile(banner.imageMobile)
     res.json({ success: true, message: 'Banner deleted' })
   } catch (error) {
     console.error('deleteBanner:', error)

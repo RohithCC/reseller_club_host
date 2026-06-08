@@ -1,6 +1,8 @@
 // routes/categoryRoute.js
 import express from 'express'
 import multer  from 'multer'
+import path   from 'path'
+import { randomUUID } from 'crypto'
 import { adminAuth } from '../middleware/adminAuth.js'
 import {
     addCategory, listCategories, singleCategory,
@@ -12,7 +14,13 @@ import {
 const categoryRouter = express.Router()
 
 // Single optional image upload (category or sub-category thumbnail)
-const storage = multer.diskStorage({ destination: 'uploads/' })
+const storage = multer.diskStorage({
+    destination: 'uploads/',
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname) || '.jpg'
+        cb(null, `${Date.now()}-${randomUUID().slice(0, 8)}${ext}`)
+    },
+})
 const upload  = multer({ storage })
 const singleImg = upload.single('image')  // field name = "image"
 

@@ -1,5 +1,23 @@
-import { v2 as cloudinary } from "cloudinary";
+import { rmSync, existsSync } from 'fs'
 import blogModel from "../models/blogModel.js"
+
+// ─── Helpers: local image URL & cleanup ──────────────────────────────────────
+const localImageUrl = (file) => (file ? `/uploads/${file.filename}` : '')
+
+const deleteImageFiles = (urls) => {
+    if (!urls || (Array.isArray(urls) && urls.length === 0)) return
+    const arr = Array.isArray(urls) ? urls : [urls]
+    for (const url of arr) {
+        if (!url || typeof url !== 'string') continue
+        if (!url.startsWith('/uploads/')) continue
+        try {
+            const filePath = `.${url}`
+            if (existsSync(filePath)) rmSync(filePath)
+        } catch (err) {
+            console.error('deleteImageFiles error:', url, err.message)
+        }
+    }
+}
 // ─── Helper: unique slug ──────────────────────────────────────────────────────
 const buildUniqueSlug = async (title, excludeId = null) => {
   const base = title
@@ -34,15 +52,8 @@ const addBlog = async (req, res) => {
       return res.json({ success: false, message: "title, description and content are required" });
     }
 
-    // Upload cover image to Cloudinary if provided
-    let imageUrl = "";
-    if (req.file) {
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        resource_type: "image",
-        folder: "amulya-blogs",
-      });
-      imageUrl = result.secure_url;
-    }
+    // Cover image saved locally by multer
+    const imageUrl = localImageUrl(req.file)
 
     const slug = await buildUniqueSlug(title);
 
@@ -157,13 +168,10 @@ const updateBlog = async (req, res) => {
     const blog = await blogModel.findById(blogId);
     if (!blog) return res.json({ success: false, message: "Blog not found" });
 
-    // New cover image
+    // New cover image — delete old one first
     if (req.file) {
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        resource_type: "image",
-        folder: "amulya-blogs",
-      });
-      blog.image = result.secure_url;
+      deleteImageFiles(blog.image)
+      blog.image = localImageUrl(req.file)
     }
 
     // Regenerate slug if title changed
@@ -194,7 +202,8 @@ const updateBlog = async (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════════
 const removeBlog = async (req, res) => {
   try {
-    await blogModel.findByIdAndDelete(req.body.id);
+    const blog = await blogModel.findByIdAndDelete(req.body.id);
+    if (blog) deleteImageFiles(blog.image)
     res.json({ success: true, message: "Blog Removed" });
   } catch (error) {
     console.log(error);
@@ -314,15 +323,29 @@ const likeBlog = async (req, res) => {
 };
 
 
-// controller
+// controller — supports both ObjectId AND slug for SEO-friendly URLs
 const getBlogById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const blog = await blogModel.findById(id);
+    // Try ObjectId first, then fall back to slug-based lookup
+    const isValidObjectId = id.match(/^[0-9a-fA-F]{24}$/);
+    let blog;
+    if (isValidObjectId) {
+      blog = await blogModel.findById(id);
+    }
+    if (!blog) {
+      blog = await blogModel.findOne({ slug: id });
+    }
 
     if (!blog) {
       return res.json({ success: false, message: "Blog not found" });
+    }
+
+    // Increment view count on slug-based access (public-facing)
+    if (!isValidObjectId) {
+      blog.views += 1;
+      await blog.save();
     }
 
     res.json({ success: true, blog });

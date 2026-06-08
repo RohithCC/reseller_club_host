@@ -118,34 +118,6 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* ── NEWSLETTER ── */}
-      <div className="bg-gradient-to-r from-orange-600 to-orange-500 py-8 px-4">
-        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row items-center justify-between gap-5">
-          <div>
-            <h3 className="text-white font-black text-xl md:text-2xl">{s.newsletterTitle}</h3>
-            <p className="text-orange-100 text-sm mt-1">{s.newsletterSubtitle}</p>
-          </div>
-          {subscribed ? (
-            <div className="bg-white/20 text-white font-bold px-6 py-3 rounded-full">
-              ✅ Subscribed! Check your inbox.
-            </div>
-          ) : (
-            <form onSubmit={handleSubscribe} className="flex gap-2 w-full max-w-sm">
-              <input
-                type="email" required value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email..."
-                className="flex-1 rounded-full px-5 py-3 text-sm outline-none bg-white/90 text-gray-800 min-w-0"
-              />
-              <button type="submit"
-                className="bg-white text-orange-600 font-black px-5 py-3 rounded-full hover:bg-orange-50 transition-all whitespace-nowrap flex-shrink-0">
-                <FiArrowRight className="text-lg" />
-              </button>
-            </form>
-          )}
-        </div>
-      </div>
-
       {/* ── MAIN FOOTER ── */}
       <div className="max-w-[1400px] mx-auto px-4 py-12">
 
@@ -367,12 +339,6 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* ── FLOATING WHATSAPP ── */}
-      <a href={s.whatsapp} target="_blank" rel="noopener noreferrer"
-        className="fixed bottom-6 right-6 z-50 bg-green-500 hover:bg-green-400 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl shadow-green-500/40 hover:scale-110 transition-all duration-200"
-        aria-label="Chat on WhatsApp">
-        <FaWhatsapp className="text-3xl" />
-      </a>
     </footer>
   )
 }

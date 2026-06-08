@@ -15,6 +15,27 @@ import express from "express";
 import Order   from "../models/Order.js";
 import { userAuth } from "../middleware/userAuth.js";
 
+// ─── Helper: emit new-order event to admin room via Socket.io ───────────────
+const emitNewOrder = (req, order) => {
+  try {
+    const io = req.app?.get('io')
+    if (!io) return
+    const payload = {
+      _id:          order._id,
+      orderNumber:  order.orderNumber,
+      grandTotal:   order.grandTotal,
+      status:       order.status,
+      createdAt:    order.createdAt,
+      billing:      order.billing ? { firstName: order.billing.firstName } : {},
+      payment:      order.payment ? { method: order.payment.method, status: order.payment.status } : {},
+      delivery:     order.delivery || {},
+    }
+    io.to('admin').emit('new-order', payload)
+  } catch (err) {
+    console.error('[WS] OrderRouter emit error:', err.message)
+  }
+}
+
 const router = express.Router();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,6 +105,9 @@ router.post("/place", userAuth, async (req, res) => {
 
     await order.save();
     console.log("[orders/place] Saved:", order.orderNumber);
+
+    // 🔔 Emit WebSocket event for real-time dashboard
+    emitNewOrder(req, order)
 
     return res.status(201).json({
       success: true,

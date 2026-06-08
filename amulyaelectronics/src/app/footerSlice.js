@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import axios from 'axios'
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL;
+const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000';
 
 // ─── Async: fetch footer settings ────────────────────────────────────────────
 export const fetchFooterSettings = createAsyncThunk(

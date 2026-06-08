@@ -1,578 +1,358 @@
-// pages/HeroBannerAdmin.jsx
-import { useState, useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import axios from 'axios'
-import {
-  FiPlus, FiEdit2, FiTrash2, FiEye, FiEyeOff,
-  FiSave, FiX, FiAlertCircle, FiCheck, FiImage,
-  FiArrowUp, FiArrowDown,
-} from 'react-icons/fi'
+import { toast } from 'react-toastify'
+import { backendUrl } from '../App'
+import ToggleSwitch from '../components/ToggleSwitch'
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000'
-
-// ── Gradient presets ──────────────────────────────────────────────────────────
-const BG_PRESETS = [
-  { label: 'Blue',   value: 'from-blue-800 via-blue-700 to-blue-900' },
-  { label: 'Orange', value: 'from-orange-600 via-orange-500 to-red-600' },
-  { label: 'Slate',  value: 'from-slate-800 via-slate-700 to-slate-900' },
-  { label: 'Green',  value: 'from-green-700 via-green-600 to-teal-800' },
-  { label: 'Purple', value: 'from-purple-800 via-purple-700 to-indigo-900' },
-  { label: 'Red',    value: 'from-red-700 via-red-600 to-rose-800' },
-]
-
-const ACCENT_PRESETS = [
-  { label: 'Yellow',  value: 'text-yellow-300' },
-  { label: 'Cyan',    value: 'text-cyan-300' },
-  { label: 'Pink',    value: 'text-pink-300' },
-  { label: 'Green',   value: 'text-green-300' },
-  { label: 'White',   value: 'text-white' },
-  { label: 'Yellow2', value: 'text-yellow-200' },
-]
-
-// ── bgImage added to empty form template ─────────────────────────────────────
 const EMPTY_FORM = {
-  badge: '', title: '', titleAccent: '', subtitle: '',
-  desc: '', cta: '', ctaLink: '',
-  bg:          BG_PRESETS[0].value,
-  accentColor: ACCENT_PRESETS[0].value,
-  image:   '',   // foreground product image
-  bgImage: '',   // ← NEW: background image URL
+  image: '', imageMobile: '', link: '/collection/',
   order: 0, isActive: true,
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const authHeaders = () => ({
-  headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-})
+const CARD = {
+  background: '#fff', border: '1px solid #e5e7eb',
+  borderRadius: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+}
 
-// ── Input label wrapper ───────────────────────────────────────────────────────
-const Field = ({ label, required, hint, children }) => (
-  <div>
-    <label className="block text-xs font-bold uppercase tracking-wider mb-1.5"
-      style={{ color: '#64748b' }}>
-      {label} {required && <span style={{ color: '#f87171' }}>*</span>}
-    </label>
-    {hint && <p className="text-[11px] mb-1.5" style={{ color: '#334155' }}>{hint}</p>}
-    {children}
-  </div>
-)
+const ii = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all'
+const ll = 'block text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em] mb-1.5'
 
-const inp = 'w-full bg-[#0a0f1e] border border-[#00c2ff22] focus:border-cyan-400 text-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none transition-colors placeholder-slate-600'
+function SlideModal({ token, onClose, onSaved }) {
+  const [form, setForm] = useState({ ...EMPTY_FORM })
+  const [loading, setLoading] = useState(false)
+  const [desktopFile, setDesktopFile] = useState(null)
+  const [mobileFile, setMobileFile] = useState(null)
+  const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
-// ── Slide list card ───────────────────────────────────────────────────────────
-const SlideCard = ({ slide, index, total, onEdit, onDelete, onToggle, onMoveUp, onMoveDown }) => (
-  <div className="rounded-2xl overflow-hidden transition-all"
-    style={{
-      background: '#0d1a2e',
-      border: `1px solid ${slide.isActive ? '#00c2ff33' : '#00c2ff11'}`,
-      opacity: slide.isActive ? 1 : 0.55,
-    }}>
+  const validateDesktopImage = (e, setFile, setFormField) => {
+    const f = e.target.files[0]
+    if (!f) return
+    if (!['image/webp', 'image/jpeg', 'image/png'].includes(f.type)) {
+      toast.error('Only WebP, JPEG, or PNG allowed.'); e.target.value = ''; return
+    }
+    if (f.size > 500 * 1024) {
+      toast.error('Image must be under 500KB.'); e.target.value = ''; return
+    }
+    const img = new Image()
+    img.onload = () => {
+      if (img.width < 1900 || img.height < 400) {
+        toast.error('Desktop image must be at least 1900×400px (wide banner).'); e.target.value = ''; return
+      }
+      setFile(f); setFormField('image', ''); URL.revokeObjectURL(img.src)
+    }
+    img.onerror = () => { toast.error('Failed to load image.'); e.target.value = '' }
+    img.src = URL.createObjectURL(f)
+  }
 
-    {/* Preview strip */}
-    <div
-      className={`bg-gradient-to-r ${slide.bg} h-20 relative flex items-center px-5 gap-4`}
-      style={slide.bgImage ? {
-        backgroundImage: `url(${slide.bgImage})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      } : undefined}
-    >
-      {/* Dark overlay so text stays readable when bgImage is set */}
-      {slide.bgImage && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
-      )}
+  const validateMobileImage = (e, setFile, setFormField) => {
+    const f = e.target.files[0]
+    if (!f) return
+    if (!['image/webp', 'image/jpeg', 'image/png'].includes(f.type)) {
+      toast.error('Only WebP, JPEG, or PNG allowed.'); e.target.value = ''; return
+    }
+    if (f.size > 500 * 1024) {
+      toast.error('Image must be under 500KB.'); e.target.value = ''; return
+    }
+    const img = new Image()
+    img.onload = () => {
+      if (img.width < 600 || img.height < 800) {
+        toast.error('Mobile image must be at least 600×800px.'); e.target.value = ''; return
+      }
+      setFile(f); setFormField('imageMobile', ''); URL.revokeObjectURL(img.src)
+    }
+    img.onerror = () => { toast.error('Failed to load image.'); e.target.value = '' }
+    img.src = URL.createObjectURL(f)
+  }
 
-      <img src={slide.image} alt={slide.title}
-        className="h-16 w-24 object-cover rounded-xl flex-shrink-0 ring-2 ring-white/20 relative z-10"
-        onError={e => { e.target.src = 'https://placehold.co/120x64?text=No+Image' }} />
+  const imgSrc = desktopFile
+    ? URL.createObjectURL(desktopFile)
+    : form.image
+      ? (form.image.startsWith('http') ? form.image : backendUrl + form.image)
+      : null
 
-      <div className="min-w-0 relative z-10">
-        <p className="text-[10px] font-bold text-white/60 truncate">{slide.badge}</p>
-        <p className="text-sm font-black text-white leading-tight truncate">{slide.title}</p>
-        <p className={`text-sm font-black ${slide.accentColor} leading-tight truncate`}>{slide.titleAccent}</p>
-      </div>
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!imgSrc) { toast.error('Desktop image is required.'); return }
+    setLoading(true)
+    try {
+      const fd = new FormData()
+      fd.append('title', 'Hero Slide')
+      fd.append('link', form.link.trim() || '/collection')
+      fd.append('order', Number(form.order) || 0)
+      fd.append('isActive', Boolean(form.isActive))
+      if (desktopFile) fd.append('image', desktopFile)
+      if (mobileFile) fd.append('imageMobile', mobileFile)
 
-      {/* Background image indicator */}
-      {slide.bgImage && (
-        <div className="absolute bottom-2 left-3 z-10">
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-            style={{ background: '#00c2ff33', color: '#00c2ff', border: '1px solid #00c2ff44' }}>
-            🖼 BG image
-          </span>
-        </div>
-      )}
-
-      {/* Status pill */}
-      <div className="absolute top-2 right-3 z-10">
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-          style={{
-            background: slide.isActive ? '#22c55e22' : '#64748b22',
-            color:      slide.isActive ? '#22c55e'   : '#64748b',
-          }}>
-          {slide.isActive ? 'Active' : 'Hidden'}
-        </span>
-      </div>
-    </div>
-
-    {/* Info + actions row */}
-    <div className="px-5 py-3 flex items-center justify-between gap-3">
-      <div className="min-w-0">
-        <p className="text-xs font-bold text-white truncate">{slide.title} {slide.titleAccent}</p>
-        <p className="text-[11px] truncate" style={{ color: '#475569' }}>{slide.cta} → {slide.ctaLink}</p>
-        {slide.bgImage && (
-          <p className="text-[10px] truncate mt-0.5" style={{ color: '#334155' }}>
-            BG: {slide.bgImage.length > 50 ? slide.bgImage.slice(0, 50) + '…' : slide.bgImage}
-          </p>
-        )}
-      </div>
-
-      {/* Action buttons */}
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        <button onClick={() => onMoveUp(index)} disabled={index === 0}
-          className="w-7 h-7 rounded-lg flex items-center justify-center transition-all disabled:opacity-30"
-          style={{ background: '#00c2ff11', color: '#00c2ff' }} title="Move Up">
-          <FiArrowUp size={13} />
-        </button>
-        <button onClick={() => onMoveDown(index)} disabled={index === total - 1}
-          className="w-7 h-7 rounded-lg flex items-center justify-center transition-all disabled:opacity-30"
-          style={{ background: '#00c2ff11', color: '#00c2ff' }} title="Move Down">
-          <FiArrowDown size={13} />
-        </button>
-
-        <button onClick={() => onToggle(slide._id)}
-          className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
-          style={{
-            background: slide.isActive ? '#22c55e22' : '#64748b22',
-            color:      slide.isActive ? '#22c55e'   : '#94a3b8',
-          }}
-          title={slide.isActive ? 'Deactivate' : 'Activate'}>
-          {slide.isActive ? <FiEye size={13} /> : <FiEyeOff size={13} />}
-        </button>
-
-        <button onClick={() => onEdit(slide)}
-          className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
-          style={{ background: '#00c2ff22', color: '#00c2ff' }} title="Edit">
-          <FiEdit2 size={13} />
-        </button>
-
-        <button onClick={() => onDelete(slide._id)}
-          className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
-          style={{ background: '#ef444422', color: '#ef4444' }} title="Delete">
-          <FiTrash2 size={13} />
-        </button>
-      </div>
-    </div>
-  </div>
-)
-
-// ── Slide form modal ──────────────────────────────────────────────────────────
-const SlideModal = ({ slide, onClose, onSave, saving, error }) => {
-  const isEdit = !!slide?._id
-  const [form, setForm] = useState(slide || EMPTY_FORM)
-
-  const set      = (key) => (e) => setForm(f => ({ ...f, [key]: e.target.value }))
-  const setCheck = (key) => (e) => setForm(f => ({ ...f, [key]: e.target.checked }))
+      const { data } = await axios.post(backendUrl + '/api/hero-banner', fd, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+      })
+      if (data.success) { toast.success('Slide created!'); onSaved(data.slide); onClose() }
+      else toast.error(data.message)
+    } catch (err) { toast.error(err.response?.data?.message || err.message) }
+    finally { setLoading(false) }
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: '#000000bb', backdropFilter: 'blur(4px)' }}
-      onClick={onClose}>
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl"
-        style={{ background: '#0d1a2e', border: '1px solid #00c2ff33' }}
-        onClick={e => e.stopPropagation()}>
-
-        {/* Modal header */}
-        <div className="flex items-center justify-between px-6 py-4"
-          style={{ borderBottom: '1px solid #00c2ff22' }}>
-          <h2 className="text-sm font-black uppercase tracking-widest" style={{ color: '#00c2ff' }}>
-            {isEdit ? 'Edit Slide' : 'Add New Slide'}
-          </h2>
-          <button onClick={onClose} style={{ color: '#64748b' }}
-            className="hover:text-white transition-colors">
-            <FiX size={18} />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-5">
-
-          {/* ── Live preview strip ── */}
-          <div
-            className={`bg-gradient-to-r ${form.bg} rounded-xl h-20 flex items-center px-4 gap-3 overflow-hidden relative`}
-            style={form.bgImage ? {
-              backgroundImage: `url(${form.bgImage})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            } : undefined}
-          >
-            {/* Dark overlay when bgImage is active */}
-            {form.bgImage && (
-              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', borderRadius: 12 }} />
-            )}
-
-            {form.image && (
-              <img src={form.image} alt="preview"
-                className="h-14 w-20 object-cover rounded-lg flex-shrink-0 ring-2 ring-white/20 relative z-10"
-                onError={e => { e.target.style.display = 'none' }} />
-            )}
-            <div className="relative z-10">
-              <p className="text-xs text-white/60 font-semibold">{form.badge || 'Badge'}</p>
-              <p className="text-sm font-black text-white">
-                {form.title || 'Title'}{' '}
-                <span className={form.accentColor}>{form.titleAccent || 'Accent'}</span>
-              </p>
-              {form.subtitle && (
-                <p className="text-xs text-white/70 mt-0.5">{form.subtitle}</p>
-              )}
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center px-4 py-6" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="h-1 rounded-t-2xl" style={{ background: 'linear-gradient(90deg, #2563eb, #1d4ed8)' }} />
+        <div className="p-5">
+          <div className="flex items-start justify-between mb-5">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">New Hero Slide</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Full-width banner shown at top of homepage</p>
             </div>
+            <button onClick={onClose} className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-400 hover:text-gray-600 flex items-center justify-center text-sm">X</button>
           </div>
 
-          {/* Error */}
-          {error && (
-            <div className="flex items-center gap-2 rounded-xl px-4 py-3"
-              style={{ background: '#7f1d1d33', border: '1px solid #ef444433' }}>
-              <FiAlertCircle size={14} style={{ color: '#ef4444' }} />
-              <p className="text-xs font-medium" style={{ color: '#fca5a5' }}>{error}</p>
+          <form onSubmit={handleSubmit} className="space-y-4">
+
+            {/* Link */}
+            <div>
+              <label className={ll}>Link (click anywhere on banner) *</label>
+              <input type="text" placeholder="/collection/summer" value={form.link} onChange={e => set('link', e.target.value)} className={ii} />
             </div>
-          )}
 
-          {/* Form fields grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Badge Text" required>
-              <input value={form.badge} onChange={set('badge')} placeholder="🎉 Sale Live Now!" className={inp} />
-            </Field>
-            <Field label="Display Order">
-              <input type="number" value={form.order} onChange={set('order')} min="0" className={inp} />
-            </Field>
-            <Field label="Title" required>
-              <input value={form.title} onChange={set('title')} placeholder="Electronic" className={inp} />
-            </Field>
-            <Field label="Title Accent" required>
-              <input value={form.titleAccent} onChange={set('titleAccent')} placeholder="Components" className={inp} />
-            </Field>
-            <Field label="Subtitle">
-              <input value={form.subtitle} onChange={set('subtitle')} placeholder="& Modules..." className={inp} />
-            </Field>
-            <Field label="Description">
-              <input value={form.desc} onChange={set('desc')} placeholder="Short description..." className={inp} />
-            </Field>
-            <Field label="CTA Button Label" required>
-              <input value={form.cta} onChange={set('cta')} placeholder="Shop Now" className={inp} />
-            </Field>
-            <Field label="CTA Link" required>
-              <input value={form.ctaLink} onChange={set('ctaLink')} placeholder="/collection/Sensors" className={inp} />
-            </Field>
-          </div>
+            {/* Desktop Image */}
+            <div>
+              <label className={ll}>Desktop Image *</label>
+              <label className="block cursor-pointer">
+                <div className="flex items-center gap-3 p-3 border-2 border-dashed border-gray-200 rounded-xl hover:border-blue-300 transition-colors bg-gray-50/50">
+                  {(desktopFile || form.image) ? (
+                    <div className="relative w-24 h-10 rounded-lg overflow-hidden shrink-0 bg-gray-100">
+                      <img src={desktopFile ? URL.createObjectURL(desktopFile) : (form.image.startsWith('http') ? form.image : backendUrl + form.image)} alt="" className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none' }} />
+                    </div>
+                  ) : (
+                    <div className="w-24 h-10 rounded-lg shrink-0 bg-gray-100 flex items-center justify-center text-gray-300">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{width:22,height:22}}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-gray-700">{desktopFile ? desktopFile.name : 'Click to upload'}</p>
+                    <p className="text-[10px] text-gray-400">{desktopFile ? (desktopFile.size / 1024).toFixed(0) + ' KB' : '1920×500px wide · Max 500KB'}</p>
+                  </div>
+                  {desktopFile && (
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setDesktopFile(null) }} className="text-red-400 hover:text-red-500 text-sm font-bold shrink-0">X</button>
+                  )}
+                </div>
+                <input type="file" accept="image/webp,image/jpeg,image/png" className="hidden" onChange={e => { validateDesktopImage(e, setDesktopFile, key => set(key, '')) }} />
+              </label>
+            </div>
 
-          {/* ── Foreground product image ── */}
-          <Field label="Product / Foreground Image URL" required
-            hint="Main product image shown in front of the slide.">
-            <div className="flex gap-2">
-              <input value={form.image} onChange={set('image')}
-                placeholder="https://example.com/product.png" className={`${inp} flex-1`} />
-              <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-slate-800 flex items-center justify-center border border-[#00c2ff22]">
-                {form.image
-                  ? <img src={form.image} alt="" className="w-full h-full object-cover"
-                      onError={e => { e.target.style.display = 'none' }} />
-                  : <FiImage size={16} style={{ color: '#475569' }} />}
+            {/* Mobile Image */}
+            <div>
+              <label className={ll}>Mobile Image</label>
+              <label className="block cursor-pointer">
+                <div className="flex items-center gap-3 p-3 border-2 border-dashed border-gray-200 rounded-xl hover:border-blue-300 transition-colors bg-gray-50/50">
+                  {(mobileFile || form.imageMobile) ? (
+                    <div className="relative w-10 h-14 rounded-lg overflow-hidden shrink-0 bg-gray-100">
+                      <img src={mobileFile ? URL.createObjectURL(mobileFile) : (form.imageMobile.startsWith('http') ? form.imageMobile : backendUrl + form.imageMobile)} alt="" className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none' }} />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-14 rounded-lg shrink-0 bg-gray-100 flex items-center justify-center text-gray-300">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{width:22,height:22}}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-gray-700">{mobileFile ? mobileFile.name : 'Click to upload (optional)'}</p>
+                    <p className="text-[10px] text-gray-400">{mobileFile ? (mobileFile.size / 1024).toFixed(0) + ' KB' : '600×800px tall · Falls back to desktop'}</p>
+                  </div>
+                  {mobileFile && (
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setMobileFile(null) }} className="text-red-400 hover:text-red-500 text-sm font-bold shrink-0">X</button>
+                  )}
+                </div>
+                <input type="file" accept="image/webp,image/jpeg,image/png" className="hidden" onChange={e => { const f = e.target.files[0]; if (f) { setMobileFile(f); set('imageMobile', '') } }} />
+              </label>
+            </div>
+
+            {/* Active toggle */}
+            <div className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-blue-600">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900">Show on homepage</p>
+                  <p className="text-[11px] text-gray-400">Slide visible in hero banner slideshow</p>
+                </div>
               </div>
+              <ToggleSwitch val={form.isActive} onToggle={() => set('isActive', !form.isActive)} />
             </div>
-          </Field>
 
-          {/* ── Background image (NEW) ── */}
-          <Field label="Background Image URL"
-            hint="Optional full-bleed background photo placed behind the gradient. Leave empty to use gradient only.">
-            <div className="flex gap-2">
-              <input value={form.bgImage} onChange={set('bgImage')}
-                placeholder="https://example.com/banner-bg.jpg (optional)" className={`${inp} flex-1`} />
-              <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-slate-800 flex items-center justify-center border border-[#00c2ff22]">
-                {form.bgImage
-                  ? <img src={form.bgImage} alt="" className="w-full h-full object-cover"
-                      onError={e => { e.target.style.display = 'none' }} />
-                  : <FiImage size={16} style={{ color: '#334155' }} />}
-              </div>
+            {/* Submit */}
+            <div className="flex gap-3 pt-2 border-t border-gray-100">
+              <button type="button" onClick={onClose} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 py-3 rounded-xl text-sm font-bold">Cancel</button>
+              <button type="submit" disabled={loading}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 disabled:opacity-40 text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-blue-600/20">
+                {loading ? 'Creating...' : 'Create Slide'}
+              </button>
             </div>
-            {/* Tip: preview updates live in the strip above */}
-            {form.bgImage && (
-              <p className="text-[11px] mt-1.5" style={{ color: '#00c2ff88' }}>
-                ✓ Background image applied — see preview above.
-              </p>
-            )}
-          </Field>
-
-          {/* ── Background gradient ── */}
-          <Field label="Gradient Overlay" required
-            hint="Shown when no background image is set, or blended over the image.">
-            <div className="grid grid-cols-3 gap-2">
-              {BG_PRESETS.map(p => (
-                <button key={p.value} type="button"
-                  onClick={() => setForm(f => ({ ...f, bg: p.value }))}
-                  className={`bg-gradient-to-r ${p.value} h-10 rounded-xl text-white text-xs font-bold transition-all`}
-                  style={{ outline: form.bg === p.value ? '2px solid #00c2ff' : 'none', outlineOffset: 2 }}>
-                  {p.label}
-                </button>
-              ))}
-            </div>
-            <input value={form.bg} onChange={set('bg')} placeholder="or type custom Tailwind class..."
-              className={`${inp} mt-2`} />
-          </Field>
-
-          {/* ── Accent colour ── */}
-          <Field label="Title Accent Color" required>
-            <div className="flex gap-2 flex-wrap">
-              {ACCENT_PRESETS.map(p => (
-                <button key={p.value} type="button"
-                  onClick={() => setForm(f => ({ ...f, accentColor: p.value }))}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${p.value}`}
-                  style={{
-                    background: form.accentColor === p.value ? '#00c2ff22' : '#0a0f1e',
-                    border: `1px solid ${form.accentColor === p.value ? '#00c2ff' : '#00c2ff22'}`,
-                  }}>
-                  {p.label}
-                </button>
-              ))}
-            </div>
-            <input value={form.accentColor} onChange={set('accentColor')} placeholder="text-yellow-300"
-              className={`${inp} mt-2`} />
-          </Field>
-
-          {/* Active toggle */}
-          <label className="flex items-center gap-3 cursor-pointer select-none">
-            <input type="checkbox" checked={form.isActive} onChange={setCheck('isActive')}
-              className="w-4 h-4 accent-cyan-400 rounded" />
-            <span className="text-sm font-semibold" style={{ color: '#94a3b8' }}>
-              Show this slide on the homepage
-            </span>
-          </label>
-
-          {/* Save */}
-          <button
-            onClick={() => onSave(form)}
-            disabled={saving}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-sm tracking-wider uppercase transition-all"
-            style={{
-              background:  saving ? '#1e3a5f' : 'linear-gradient(90deg,#00c2ff,#0077b6)',
-              color:       '#fff',
-              boxShadow:   saving ? 'none' : '0 0 20px #00c2ff44',
-              cursor:      saving ? 'not-allowed' : 'pointer',
-            }}>
-            {saving
-              ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Saving...</>
-              : <><FiSave size={15} /> {isEdit ? 'Update Slide' : 'Create Slide'}</>}
-          </button>
+          </form>
         </div>
       </div>
     </div>
   )
 }
 
-// ── Main admin page ───────────────────────────────────────────────────────────
-export default function HeroBannerAdmin() {
-  const [slides,   setSlides]   = useState([])
-  const [loading,  setLoading]  = useState(true)
-  const [modal,    setModal]    = useState(null)   // null | form object
-  const [saving,   setSaving]   = useState(false)
-  const [deleting, setDeleting] = useState(null)
-  const [error,    setError]    = useState('')
-  const [toast,    setToast]    = useState('')
-  const [formErr,  setFormErr]  = useState('')
-
-  // ── Fetch all slides ──────────────────────────────────────────────────────
-  const fetchSlides = async () => {
+function DeleteModal({ slide, token, onClose, onDeleted }) {
+  const [loading, setLoading] = useState(false)
+  const handleDelete = async () => {
     setLoading(true)
     try {
-      const { data } = await axios.get(`${API_BASE}/api/hero-banner/admin`, authHeaders())
-      if (data.success) setSlides(data.slides)
-      else setError(data.message)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
+      const { data } = await axios.delete(backendUrl + '/api/hero-banner/' + slide._id, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (data.success) { toast.success('Deleted'); onDeleted(slide._id); onClose() }
+      else toast.error(data.message)
+    } catch (err) { toast.error(err.response?.data?.message || err.message) }
+    finally { setLoading(false) }
   }
-  useEffect(() => { fetchSlides() }, [])
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+        <div className="text-center mb-5">
+          <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">X</div>
+          <h2 className="text-lg font-bold text-gray-900">Delete Slide?</h2>
+          <p className="text-xs text-gray-500 mt-2">This hero slide will be removed permanently.</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 py-3 rounded-xl text-sm font-bold">Cancel</button>
+          <button onClick={handleDelete} disabled={loading}
+            className="flex-1 bg-red-500 hover:bg-red-400 disabled:opacity-50 text-white py-3 rounded-xl text-sm font-bold">{loading ? 'Deleting...' : 'Delete'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
-
-  // ── Save (create or update) ───────────────────────────────────────────────
-  const handleSave = async (form) => {
-    setFormErr('')
-    // Validate required fields only
-    if (!form.badge || !form.title || !form.titleAccent || !form.cta ||
-        !form.ctaLink || !form.bg || !form.accentColor || !form.image) {
-      setFormErr('Please fill in all required fields (bgImage is optional).')
-      return
-    }
-    setSaving(true)
+function SlideCard({ slide, index, total, token, onDelete, onToggle, onMove }) {
+  const [toggling, setToggling] = useState(false)
+  const handleToggle = async () => {
+    setToggling(true)
     try {
-      const isEdit = !!form._id
-      const url    = isEdit
-        ? `${API_BASE}/api/hero-banner/${form._id}`
-        : `${API_BASE}/api/hero-banner`
-      const method = isEdit ? axios.put : axios.post
-      const { data } = await method(url, form, authHeaders())
-
-      if (data.success) {
-        setSlides(prev =>
-          isEdit
-            ? prev.map(s => s._id === data.slide._id ? data.slide : s)
-            : [...prev, data.slide]
-        )
-        setModal(null)
-        showToast(isEdit ? 'Slide updated!' : 'Slide created!')
-      } else {
-        setFormErr(data.message || 'Save failed.')
-      }
-    } catch (err) {
-      setFormErr(err.message)
-    } finally {
-      setSaving(false)
-    }
+      const { data } = await axios.patch(backendUrl + '/api/hero-banner/' + slide._id + '/toggle', {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (data.success) { toast.success(data.message); onToggle({ ...slide, isActive: data.isActive }) }
+      else toast.error(data.message)
+    } catch (err) { toast.error(err.response?.data?.message || err.message) }
+    finally { setToggling(false) }
   }
-
-  // ── Delete ────────────────────────────────────────────────────────────────
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this slide? This cannot be undone.')) return
-    setDeleting(id)
-    try {
-      const { data } = await axios.delete(`${API_BASE}/api/hero-banner/${id}`, authHeaders())
-      if (data.success) {
-        setSlides(prev => prev.filter(s => s._id !== id))
-        showToast('Slide deleted.')
-      }
-    } catch {
-      showToast('Delete failed.')
-    } finally {
-      setDeleting(null)
-    }
-  }
-
-  // ── Toggle active ─────────────────────────────────────────────────────────
-  const handleToggle = async (id) => {
-    try {
-      const { data } = await axios.patch(
-        `${API_BASE}/api/hero-banner/${id}/toggle`, {}, authHeaders()
-      )
-      if (data.success) {
-        setSlides(prev => prev.map(s => s._id === id ? { ...s, isActive: data.isActive } : s))
-        showToast(data.message)
-      }
-    } catch {
-      showToast('Toggle failed.')
-    }
-  }
-
-  // ── Reorder (local swap + persist order field) ────────────────────────────
-  const handleMove = async (index, dir) => {
-    const newSlides = [...slides]
-    const target    = index + dir
-    if (target < 0 || target >= newSlides.length) return
-    ;[newSlides[index], newSlides[target]] = [newSlides[target], newSlides[index]]
-    newSlides.forEach((s, i) => { s.order = i })
-    setSlides(newSlides)
-    try {
-      await Promise.all([
-        axios.put(`${API_BASE}/api/hero-banner/${newSlides[index]._id}`,  { order: newSlides[index].order },  authHeaders()),
-        axios.put(`${API_BASE}/api/hero-banner/${newSlides[target]._id}`, { order: newSlides[target].order }, authHeaders()),
-      ])
-    } catch { /* silent — UI already updated */ }
-  }
+  const st = slide.isActive ? { bg: '#f0fdf4', text: '#16a34a', dot: '#22c55e', border: '#bbf7d0', label: 'Active' }
+    : { bg: '#f3f4f6', text: '#9ca3af', dot: '#d1d5db', border: '#e5e7eb', label: 'Hidden' }
 
   return (
-    <div className="min-h-screen p-6" style={{ background: '#0a0f1e', fontFamily: "'Courier New',monospace" }}>
-      <div className="max-w-4xl mx-auto">
-
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-          <div>
-            <h1 className="text-2xl font-black text-white tracking-widest uppercase mb-0.5">
-              Hero Banner
-            </h1>
-            <p className="text-xs" style={{ color: '#475569' }}>
-              {slides.length} slide{slides.length !== 1 ? 's' : ''} · {slides.filter(s => s.isActive).length} active
-            </p>
-          </div>
-          <button
-            onClick={() => { setFormErr(''); setModal({ ...EMPTY_FORM }) }}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all"
-            style={{ background: 'linear-gradient(90deg,#00c2ff,#0077b6)', color: '#fff', boxShadow: '0 0 20px #00c2ff33' }}>
-            <FiPlus size={15} /> Add Slide
-          </button>
+    <div style={{ ...CARD, overflow: 'hidden', opacity: !slide.isActive ? 0.6 : 1 }}>
+      <div className="absolute top-0 left-0 w-1 h-full rounded-l-[14px]" style={{ background: st.dot }} />
+      <div className="flex items-center gap-4 p-4 pl-5">
+        <div className="flex flex-col gap-1 shrink-0">
+          <button onClick={() => onMove(index, index - 1)} disabled={index === 0} className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-20 text-gray-500 text-xs">^</button>
+          <span className="text-[9px] text-gray-300 font-mono text-center">{index + 1}</span>
+          <button onClick={() => onMove(index, index + 1)} disabled={index === total - 1} className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-20 text-gray-500 text-xs">v</button>
         </div>
-
-        {/* Fetch error */}
-        {error && (
-          <div className="flex items-center gap-2 rounded-xl px-4 py-3 mb-5"
-            style={{ background: '#7f1d1d33', border: '1px solid #ef444433' }}>
-            <FiAlertCircle size={15} style={{ color: '#ef4444' }} />
-            <p className="text-xs font-medium" style={{ color: '#fca5a5' }}>{error}</p>
+        <div className="relative w-32 h-14 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
+          <img src={slide.image?.startsWith('http') ? slide.image : backendUrl + slide.image} alt="" className="absolute inset-0 w-full h-full object-cover" onError={e => { e.target.style.display = 'none' }} />
+          {slide.imageMobile && <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[7px] px-1 py-0.5 rounded">M</span>}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-2 flex-wrap">
+            <p className="text-sm font-bold text-gray-900 truncate max-w-[200px]">Hero Slide #{slide.order !== undefined ? slide.order + 1 : ''}</p>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, border: '1px solid ' + st.border, background: st.bg, color: st.text, flexShrink: 0 }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: st.dot, display: 'inline-block' }} />{st.label}
+            </span>
           </div>
-        )}
-
-        {/* Loading skeleton */}
-        {loading && (
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-28 rounded-2xl animate-pulse" style={{ background: '#0d1a2e' }} />
-            ))}
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
+            <span className="text-[10px] text-blue-600 font-mono bg-blue-50 border border-blue-200 px-2 py-0.5 rounded truncate max-w-[220px]">{slide.link}</span>
+            {slide.imageMobile && <span className="text-[9px] text-indigo-500 font-bold bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">Mobile img</span>}
           </div>
-        )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <ToggleSwitch val={slide.isActive} onToggle={handleToggle} disabled={toggling} />
+          <button onClick={() => onDelete(slide)} className="text-[10px] font-bold bg-white border border-gray-200 hover:border-red-300 text-gray-500 hover:text-red-500 px-3 py-1.5 rounded-lg">Delete</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-        {/* Empty state */}
-        {!loading && slides.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <FiImage size={40} style={{ color: '#1e3a5f' }} className="mb-4" />
-            <p className="font-bold text-sm" style={{ color: '#334155' }}>No slides yet</p>
-            <p className="text-xs mt-1 mb-6" style={{ color: '#1e3a5f' }}>Add your first hero banner slide</p>
-            <button onClick={() => { setFormErr(''); setModal({ ...EMPTY_FORM }) }}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black"
-              style={{ background: '#00c2ff22', color: '#00c2ff', border: '1px solid #00c2ff33' }}>
-              <FiPlus size={14} /> Add First Slide
-            </button>
-          </div>
-        )}
+export default function HeroBannerAdmin({ token }) {
+  const [slides, setSlides] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showModal, setShowModal] = useState(false)
+  const [deleteSlide, setDeleteSlide] = useState(null)
 
-        {/* Slides list */}
-        {!loading && slides.length > 0 && (
-          <div className="space-y-3">
-            {slides.map((slide, i) => (
-              <SlideCard
-                key={slide._id}
-                slide={slide}
-                index={i}
-                total={slides.length}
-                onEdit={(s) => { setFormErr(''); setModal({ ...s }) }}
-                onDelete={handleDelete}
-                onToggle={handleToggle}
-                onMoveUp={(idx)  => handleMove(idx, -1)}
-                onMoveDown={(idx) => handleMove(idx,  1)}
-              />
-            ))}
-          </div>
-        )}
+  const fetchSlides = useCallback(async () => {
+    setLoading(true)
+    try {
+      const { data } = await axios.get(backendUrl + '/api/hero-banner/admin', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (data.success) setSlides(data.slides ?? [])
+      else toast.error(data.message)
+    } catch (err) { toast.error('Failed to load'); console.error(err) }
+    finally { setLoading(false) }
+  }, [token])
 
-        {/* Reorder hint */}
-        {slides.length > 1 && (
-          <p className="text-center text-xs mt-4" style={{ color: '#1e3a5f' }}>
-            Use ↑ ↓ arrows to reorder slides
+  useEffect(() => { fetchSlides() }, [fetchSlides])
+
+  const onSaved = (slide) => {
+    setSlides(prev => [...prev, slide].sort((a, b) => a.order - b.order))
+  }
+  const onToggle = (slide) => setSlides(prev => prev.map(s => s._id === slide._id ? slide : s))
+  const onDeleted = (id) => setSlides(prev => prev.filter(s => s._id !== id))
+
+  const handleMove = async (fromIdx, toIdx) => {
+    if (toIdx < 0 || toIdx >= slides.length) return
+    const reordered = [...slides]
+    const [moved] = reordered.splice(fromIdx, 1)
+    reordered.splice(toIdx, 0, moved)
+    reordered.forEach((s, i) => { s.order = i })
+    setSlides(reordered)
+    try {
+      await Promise.all([
+        axios.put(backendUrl + '/api/hero-banner/' + reordered[fromIdx]._id, { order: reordered[fromIdx].order }, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.put(backendUrl + '/api/hero-banner/' + reordered[toIdx]._id, { order: reordered[toIdx].order }, { headers: { Authorization: `Bearer ${token}` } }),
+      ])
+    } catch { fetchSlides() }
+  }
+
+  const activeCount = slides.filter(s => s.isActive).length
+
+  return (
+    <div style={{ maxWidth: 860, width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {showModal && <SlideModal token={token} onClose={() => setShowModal(false)} onSaved={onSaved} />}
+      {deleteSlide && <DeleteModal slide={deleteSlide} token={token} onClose={() => setDeleteSlide(null)} onDeleted={onDeleted} />}
+
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#111827', margin: 0 }}>Hero Banner</h1>
+          <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>
+            {loading ? 'Loading...' : activeCount + ' active \u00B7 ' + (slides.length - activeCount) + ' hidden \u00B7 ' + slides.length + ' total'}
           </p>
-        )}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={fetchSlides} disabled={loading} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Refresh</button>
+          <button onClick={() => setShowModal(true)} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>+ Add Slide</button>
+        </div>
       </div>
 
-      {/* Modal */}
-      {modal !== null && (
-        <SlideModal
-          slide={modal}
-          onClose={() => setModal(null)}
-          onSave={handleSave}
-          saving={saving}
-          error={formErr}
-        />
-      )}
-
-      {/* Toast notification */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold z-50"
-          style={{ background: '#0d1a2e', border: '1px solid #00c2ff33', color: '#00c2ff', boxShadow: '0 0 20px #00c2ff22' }}>
-          <FiCheck size={14} /> {toast}
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[1,2,3].map(i => <div key={i} style={{ ...CARD, height: 72, background: '#f9fafb' }} />)}
+        </div>
+      ) : slides.length === 0 ? (
+        <div style={{ ...CARD, padding: 50, textAlign: 'center' }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>No slides yet</p>
+          <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>Create your first hero banner slide.</p>
+          <button onClick={() => setShowModal(true)} style={{ marginTop: 14, padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>+ Add First Slide</button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {slides.map((slide, idx) => (
+            <SlideCard key={slide._id} slide={slide} index={idx} total={slides.length} token={token} onDelete={setDeleteSlide} onToggle={onToggle} onMove={handleMove} />
+          ))}
         </div>
       )}
     </div>

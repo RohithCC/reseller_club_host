@@ -11,26 +11,51 @@ const showcaseBannerSchema = new mongoose.Schema(
     },
     subtitle: {
       type:      String,
-      required:  [true, 'Subtitle is required'],
+      default:   '',
       trim:      true,
       maxlength: [300, 'Subtitle cannot exceed 300 characters'],
     },
     cta: {
       type:      String,
-      required:  [true, 'CTA text is required'],
       trim:      true,
       default:   'Shop Now',
       maxlength: [40, 'CTA cannot exceed 40 characters'],
     },
     link: {
       type:     String,
-      required: [true, 'Link is required'],
+      default:  '',
       trim:     true,
     },
+    // Background colour for the section (Tailwind class or hex)
+    bgColor: {
+      type:    String,
+      default: 'bg-white',
+      trim:    true,
+    },
+    // Description shown below title (for CTA section variant)
+    description: {
+      type:    String,
+      default: '',
+      trim:    true,
+      maxlength: [500, 'Description cannot exceed 500 characters'],
+    },
+    // Array of CTA buttons [{ label, link, icon }]
+    buttons: [{
+      label: { type: String, trim: true, maxlength: 40 },
+      link:  { type: String, trim: true },
+      icon:  { type: String, default: '', trim: true },
+    }],
+    // Desktop banner image (1400x440 recommended)
     image: {
       type:     String,
       required: [true, 'Image URL is required'],
       trim:     true,
+    },
+    // Mobile banner image (600x800 recommended) — falls back to desktop image if empty
+    imageMobile: {
+      type:    String,
+      default: '',
+      trim:    true,
     },
     // Tailwind gradient string e.g. "from-slate-900/85 via-slate-900/50 to-transparent"
     overlay: {

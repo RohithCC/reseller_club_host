@@ -9,7 +9,7 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
-const BASE = import.meta.env.VITE_BACKEND_URL;
+const BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000';
 
 // Backend reads req.userId from JWT — never send userId in body
 const authHeader = (token) => ({ token });

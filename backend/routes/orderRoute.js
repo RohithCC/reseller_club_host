@@ -5,7 +5,8 @@ import { userAuth }  from '../middleware/userAuth.js'
 import {
     placeOrder, placeOrderRazorpay, verifyRazorpay,
     userOrders, orderDetail, cancelOrder, requestReturn,
-    allOrders, updateStatus, processRefund
+    allOrders, updateStatus, processRefund,
+    getNewOrders, bulkUpdateStatus
 } from '../controllers/orderController.js'
 
 const orderRouter = express.Router()
@@ -20,8 +21,10 @@ orderRouter.post('/cancel',         userAuth,  cancelOrder)
 orderRouter.post('/return',         userAuth,  requestReturn)
 
 // ── Admin routes ──────────────────────────────────────────────────────────────
-orderRouter.get( '/all',    adminAuth, allOrders)   // GET  /api/order/all?status=&page=&limit=&search=
-orderRouter.post('/status', adminAuth, updateStatus)
-orderRouter.post('/refund', adminAuth, processRefund)
+orderRouter.get( '/all',    adminAuth, allOrders)      // GET  /api/order/all?status=&page=&limit=&search=
+orderRouter.get( '/new-orders', adminAuth, getNewOrders) // GET  /api/order/new-orders?since=
+orderRouter.post('/status',     adminAuth, updateStatus)
+orderRouter.post('/refund',     adminAuth, processRefund)
+orderRouter.post('/bulk-status', adminAuth, bulkUpdateStatus)
 
 export default orderRouter

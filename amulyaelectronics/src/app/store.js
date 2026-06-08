@@ -7,7 +7,6 @@ import orderReducer from "./orderSlice";  // src/app/footerSlice.js
 import orderDetailsReducer from "./orderDetailsSlice";
 import userProfileReducer from "./userProfileSlice";
 import categoryReducer from "./categorySlice";
-import contentReducer from "./Contentslice";
 import searchReducer from './searchSlice';
 import projectContentReducer from "./projectcontentslice";
 
@@ -21,7 +20,6 @@ const store = configureStore({
       orderDetails: orderDetailsReducer,
       userProfile: userProfileReducer,
        categories: categoryReducer,   
-        content: contentReducer,   // ← add this line
         search: searchReducer,
         projectContent: projectContentReducer,
    

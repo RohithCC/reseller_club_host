@@ -66,6 +66,8 @@ const fmtDate = (d) => d
 const fmtDateTime = (d) => d
   ? new Date(d).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
   : "—";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:10000";
+const resolveUrl  = (path) => path?.startsWith("http") ? path : `${BACKEND_URL}${path}`;
 const fmtPrice = (n) => `₹${Number(n ?? 0).toLocaleString("en-IN")}`;
  
 // ── Small components ──────────────────────────────────────────────────────────
@@ -476,7 +478,7 @@ export default function OrderDetails() {
                     return (
                       <div key={idx} className="flex gap-3 py-3 items-center">
                         <div className="w-14 h-14 flex-shrink-0 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden flex items-center justify-center p-1.5">
-                          <img src={item.image} alt={item.name}
+                          <img src={resolveUrl(item.image)} alt={item.name}
                             className="max-w-full max-h-full object-contain"
                             onError={(e) => { e.target.src = "https://placehold.co/56x56?text=📦"; }} />
                         </div>

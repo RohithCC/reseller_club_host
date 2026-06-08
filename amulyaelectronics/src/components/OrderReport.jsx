@@ -17,6 +17,8 @@ import {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:10000";
+const resolveUrl  = (path) => path?.startsWith("http") ? path : `${BACKEND_URL}${path}`;
 const fmtPrice = (n) =>
   `₹${Number(n ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -237,7 +239,7 @@ export default function OrderReport({ order, onClose }) {
                         <div className="flex items-center gap-2">
                           <div className="w-9 h-9 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center flex-shrink-0 p-1">
                             <img
-                              src={item.image || "https://placehold.co/36x36?text=📦"}
+                              src={resolveUrl(item.image) || "https://placehold.co/36x36?text=📦"}
                               alt={item.name}
                               className="max-w-full max-h-full object-contain"
                               onError={(e) => { e.target.src = "https://placehold.co/36x36?text=📦"; }}

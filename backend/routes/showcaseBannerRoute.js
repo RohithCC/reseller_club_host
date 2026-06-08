@@ -17,6 +17,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import express from 'express'
+import multer from 'multer'
+import { randomUUID } from 'crypto'
+import path from 'path'
 import {
   getActiveBanners,
   getAllBanners,
@@ -26,19 +29,33 @@ import {
   toggleBanner,
   reorderBanners,
 } from '../controllers/showcaseBannerController.js'
-import { adminAuth } from '../middleware/adminAuth.js'
+import { adminOrSuperAdminAuth } from '../middleware/adminAuth.js'
 
 const showcaseBannerRouter = express.Router()
+
+// ── Multer – local disk storage for banner uploads ───────────────────────────
+const storage = multer.diskStorage({
+  destination: 'uploads/',
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.jpg'
+    cb(null, `banner-${Date.now()}-${randomUUID().slice(0, 8)}${ext}`)
+  },
+})
+const upload = multer({ storage })
+const bannerUpload = upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'imageMobile', maxCount: 1 },
+])
 
 // ── Public (no auth) ──────────────────────────────────────────────────────────
 showcaseBannerRouter.get('/banners', getActiveBanners)
 
 // ── Admin (adminAuth required) ────────────────────────────────────────────────
-showcaseBannerRouter.get   ('/admin/banners',            adminAuth, getAllBanners)
-showcaseBannerRouter.post  ('/admin/banners',            adminAuth, createBanner)
-showcaseBannerRouter.put   ('/admin/banners/:id',        adminAuth, updateBanner)
-showcaseBannerRouter.delete('/admin/banners/:id',        adminAuth, deleteBanner)
-showcaseBannerRouter.put   ('/admin/banners/:id/toggle', adminAuth, toggleBanner)
-showcaseBannerRouter.put   ('/admin/reorder',            adminAuth, reorderBanners)
+showcaseBannerRouter.get   ('/admin/banners',            adminOrSuperAdminAuth, getAllBanners)
+showcaseBannerRouter.post  ('/admin/banners',            adminOrSuperAdminAuth, bannerUpload, createBanner)
+showcaseBannerRouter.put   ('/admin/banners/:id',        adminOrSuperAdminAuth, bannerUpload, updateBanner)
+showcaseBannerRouter.delete('/admin/banners/:id',        adminOrSuperAdminAuth, deleteBanner)
+showcaseBannerRouter.put   ('/admin/banners/:id/toggle', adminOrSuperAdminAuth, toggleBanner)
+showcaseBannerRouter.put   ('/admin/reorder',            adminOrSuperAdminAuth, reorderBanners)
 
 export default showcaseBannerRouter

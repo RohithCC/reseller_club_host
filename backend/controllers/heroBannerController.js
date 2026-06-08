@@ -1,5 +1,17 @@
 // controllers/heroBannerController.js
 import heroBannerModel from '../models/heroBannerModel.js'
+import fs   from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const UPLOADS   = path.join(__dirname, '..', 'uploads')
+
+const deleteFile = (filePath) => {
+  if (!filePath || filePath.startsWith('http')) return
+  const full = path.join(UPLOADS, path.basename(filePath))
+  if (fs.existsSync(full)) fs.unlinkSync(full)
+}
 
 // ─── GET ALL SLIDES (public) ──────────────────────────────────────────────────
 // GET /api/hero-banner
@@ -30,31 +42,38 @@ const getAllSlidesAdmin = async (req, res) => {
 
 // ─── CREATE SLIDE ─────────────────────────────────────────────────────────────
 // POST /api/hero-banner
-// Body: { badge, title, titleAccent, subtitle, desc, cta, ctaLink,
-//         bg, accentColor, image, bgImage, order, isActive }
+// Body: { image, imageMobile, link, title, isActive } plus optional legacy fields
 const createSlide = async (req, res) => {
   try {
-    const {
-      badge, title, titleAccent, subtitle, desc,
-      cta, ctaLink, bg, accentColor,
-      image,    // foreground product image — required
-      bgImage,  // background image URL      — optional
-      order, isActive,
-    } = req.body
+    const { title, link, image, imageMobile, badge, titleAccent, subtitle, desc,
+      cta, ctaLink, bg, accentColor, bgImage, order, isActive } = req.body
 
-    // Only hard-required fields are validated
-    if (!badge || !title || !titleAccent || !cta || !ctaLink || !bg || !accentColor || !image)
-      return res.json({ success: false, message: 'All required fields must be filled.' })
+    // Handle uploaded files — file path takes priority over text field
+    let imagePath = image?.trim() || ''
+    let mobilePath = imageMobile?.trim() || ''
+    if (req.files) {
+      if (req.files.image && req.files.image[0]) imagePath = '/uploads/' + req.files.image[0].filename
+      if (req.files.imageMobile && req.files.imageMobile[0]) mobilePath = '/uploads/' + req.files.imageMobile[0].filename
+    }
+
+    if (!imagePath) return res.json({ success: false, message: 'Desktop banner image is required.' })
 
     const slide = await heroBannerModel.create({
-      badge, title, titleAccent,
-      subtitle: subtitle ?? '',
-      desc:     desc     ?? '',
-      cta, ctaLink, bg, accentColor,
-      image,
-      bgImage:  bgImage  ?? '',   // ← stored (empty string if not provided)
-      order:    order    ?? 0,
-      isActive: isActive ?? true,
+      title:       title?.trim()       || 'Hero Slide',
+      link:        link?.trim()        || '/collection',
+      image:       imagePath,
+      imageMobile: mobilePath,
+      badge:       badge?.trim()       || '',
+      titleAccent: titleAccent?.trim() || '',
+      subtitle:    subtitle?.trim()    || '',
+      desc:        desc?.trim()        || '',
+      cta:         cta?.trim()         || 'Shop Now',
+      ctaLink:     ctaLink?.trim()     || link?.trim() || '/collection',
+      bg:          bg?.trim()          || 'from-blue-800 via-blue-700 to-blue-900',
+      accentColor: accentColor?.trim() || 'text-yellow-300',
+      bgImage:     bgImage?.trim()     || '',
+      order:       order !== undefined ? Number(order) : 0,
+      isActive:    isActive !== undefined ? Boolean(isActive) : true,
     })
 
     res.json({ success: true, slide, message: 'Slide created successfully.' })
@@ -66,11 +85,23 @@ const createSlide = async (req, res) => {
 
 // ─── UPDATE SLIDE ─────────────────────────────────────────────────────────────
 // PUT /api/hero-banner/:id
-// Accepts any subset of fields — including bgImage
+// Accepts any subset of fields — handles file uploads for image + imageMobile
 const updateSlide = async (req, res) => {
   try {
     const { id } = req.params
-    const updates = req.body   // bgImage included automatically via $set spread
+    const { image, imageMobile } = req.body
+
+    // Handle uploaded files — file path takes priority
+    let imagePath = image?.trim()
+    let mobilePath = imageMobile?.trim()
+    if (req.files) {
+      if (req.files.image && req.files.image[0]) imagePath = '/uploads/' + req.files.image[0].filename
+      if (req.files.imageMobile && req.files.imageMobile[0]) mobilePath = '/uploads/' + req.files.imageMobile[0].filename
+    }
+
+    const updates = { ...req.body }
+    if (imagePath !== undefined) updates.image = imagePath
+    if (mobilePath !== undefined) updates.imageMobile = mobilePath
 
     const slide = await heroBannerModel.findByIdAndUpdate(
       id,
@@ -78,9 +109,7 @@ const updateSlide = async (req, res) => {
       { new: true, runValidators: true }
     )
 
-    if (!slide)
-      return res.json({ success: false, message: 'Slide not found.' })
-
+    if (!slide) return res.json({ success: false, message: 'Slide not found.' })
     res.json({ success: true, slide, message: 'Slide updated successfully.' })
   } catch (error) {
     console.log(error)
@@ -96,6 +125,8 @@ const deleteSlide = async (req, res) => {
     const slide = await heroBannerModel.findByIdAndDelete(id)
     if (!slide)
       return res.json({ success: false, message: 'Slide not found.' })
+    deleteFile(slide.image)
+    deleteFile(slide.imageMobile)
     res.json({ success: true, message: 'Slide deleted.' })
   } catch (error) {
     console.log(error)

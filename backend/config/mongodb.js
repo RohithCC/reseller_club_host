@@ -12,7 +12,7 @@ const connectDB = async () => {
 
   } catch (error) {
     console.log("❌ Connection Failed:", error.message);
-    process.exit(1);
+    console.log("⚠️  Server will continue without database. Only non-DB endpoints will work.");
   }
 };
 

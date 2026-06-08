@@ -3,7 +3,7 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
-const API = import.meta.env.VITE_BACKEND_URL;
+const API = import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000';
 
 // ─── Async Thunk ──────────────────────────────────────────────────────────────
 export const fetchProjects = createAsyncThunk(

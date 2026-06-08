@@ -6,7 +6,9 @@ import {
   FiArrowRight, FiGrid, FiList, FiX,
 } from "react-icons/fi";
 
-const API_BASE  = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+const API_BASE  = import.meta.env.VITE_API_URL || "http://localhost:10000/api";
+const BACKEND_URL = API_BASE.replace(/\/api$/, "");
+const resolveUrl  = (path) => path?.startsWith('http') ? path : `${BACKEND_URL}${path}`;
 const PAGE_SIZE = 6;
 
 function formatDate(ts) {
@@ -44,7 +46,7 @@ function BlogCard({ post, view }) {
 
         <div className="w-28 sm:w-36 flex-shrink-0 rounded-xl overflow-hidden bg-gray-50 h-24 sm:h-28">
           <img
-            src={post.image}
+            src={resolveUrl(post.image)}
             alt={post.title}
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
@@ -92,7 +94,7 @@ function BlogCard({ post, view }) {
 
       <div className="relative h-48 overflow-hidden bg-gray-50 flex-shrink-0">
         <img
-          src={post.image}
+          src={resolveUrl(post.image)}
           alt={post.title}
           loading="lazy"
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
@@ -379,7 +381,7 @@ export default function Blog() {
 
     <div className="grid grid-cols-1 md:grid-cols-[1fr_420px]">
       <div className="relative h-56 md:h-auto overflow-hidden bg-gray-50">
-        <img src={featured.image} alt={featured.title}
+        <img src={resolveUrl(featured.image)} alt={featured.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
       </div>
 

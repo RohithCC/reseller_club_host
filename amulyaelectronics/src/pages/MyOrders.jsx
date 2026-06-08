@@ -51,6 +51,8 @@ const FILTER_TABS = [
 const fmtDate  = (d) => d
   ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
   : "—";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:10000";
+const resolveUrl  = (path) => path?.startsWith("http") ? path : `${BACKEND_URL}${path}`;
 const fmtPrice = (n) => `₹${Number(n ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
 // ─── OrderCard ────────────────────────────────────────────────────────────────
@@ -99,7 +101,7 @@ function OrderCard({ order, onDownloadReport }) {
                 style={{ zIndex: 3 - idx }}
                 className="w-12 h-12 rounded-xl bg-gray-50 border-2 border-white shadow-sm overflow-hidden flex items-center justify-center p-1">
                 <img
-                  src={item.image || "https://placehold.co/48x48?text=📦"}
+                  src={resolveUrl(item.image) || "https://placehold.co/48x48?text=📦"}
                   alt={item.name}
                   className="max-w-full max-h-full object-contain"
                   onError={(e) => { e.target.src = "https://placehold.co/48x48?text=📦"; }}

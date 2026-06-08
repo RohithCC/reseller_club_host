@@ -7,7 +7,7 @@ import {
 import axios from 'axios'
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000'
+const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000'
 
 // Password strength helper
 const getStrength = (pwd) => {

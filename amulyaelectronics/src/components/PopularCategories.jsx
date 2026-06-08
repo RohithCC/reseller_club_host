@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000'
+const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000'
 
 // ── Skeleton card ─────────────────────────────────────────────────────────────
 function SkeletonCard() {
@@ -32,7 +32,7 @@ function CategoryCard({ name, count, image, onClick }) {
       <div className="w-20 h-20 flex items-center justify-center overflow-hidden rounded-xl bg-gray-50 border border-gray-100 group-hover:border-blue-100 transition-colors">
         {image && !imgError ? (
           <img
-            src={image}
+            src={image?.startsWith('http') ? image : `${BACKEND}${image}`}
             alt={name}
             className="w-full h-full object-contain p-2 group-hover:scale-110 transition-transform duration-300"
             onError={() => setImgError(true)}

@@ -56,7 +56,7 @@ const wishlistSlice = createSlice({
         state.items.splice(idx, 1)
       } else {
         // ── Add: normalise image to a string before storing ───────
-        // Prevents issues if product.image is an array (Cloudinary returns arrays)
+        // Prevents issues if product.image is an array (images stored as arrays in MongoDB)
         state.items.push({
           id:       incoming.id,
           name:     incoming.name,

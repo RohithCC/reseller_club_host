@@ -14,7 +14,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import axios from 'axios'
 
-const BASE = import.meta.env.VITE_BACKEND_URL;
+const BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000';
 
 // ─── THUNKS ───────────────────────────────────────────────────────────────────
 
