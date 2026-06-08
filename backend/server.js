@@ -55,10 +55,10 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }))
 
 // ✅ Allowed Origins
 const allowedOrigins = [
-  "https://askpoint.online",
-  "https://www.askpoint.online",
-  "https://admin.askpoint.online",
-  "https://api.askpoint.online",
+  "https://amulyaelectronics.com",
+  "https://www.amulyaelectronics.com",
+  "https://admin.amulyaelectronics.com",
+  "https://api.amulyaelectronics.com",
   "http://localhost:5173",
   "http://localhost:5174",
 ]
