@@ -11,7 +11,6 @@ import axios from "axios";
 
 import { addToCart, updateItemQty } from "../app/cartSlice";
 import { toggleWishlist }           from "../app/wishlistSlice";
-import ToggleSwitch from "../components/ToggleSwitch";
 import {
   fetchCategoryTree,
   selectCategoryNames,
@@ -19,10 +18,10 @@ import {
   selectSubCategories,
 } from "../app/categorySlice";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:10000";
-const resolveUrl   = (path) => path?.startsWith("http") ? path : `${BACKEND_URL}${path}`;
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 const RATINGS     = [4, 3, 2, 1];
-const PER_PAGE    = 10;
+const PER_PAGE    = 10;     // items shown per UI page (client-side pagination)
+const FETCH_LIMIT = 100;    // items requested per backend round-trip while loading all
 
 // ── Convert "some-slug-name" → "some slug name" for fuzzy matching ─────────
 function slugToWords(slug) {
@@ -47,6 +46,27 @@ function matchCategory(urlSegment, categoryNames) {
   if (slugMatch) return slugMatch;
   // 3. Fallback
   return categoryNames[0] || "";
+}
+
+// ── Robustly read a "total count" from any reasonable response shape ───────
+function readTotal(data) {
+  const candidates = [
+    data?.total,
+    data?.totalCount,
+    data?.count,
+    data?.totalProducts,
+    data?.totalItems,
+    data?.pagination?.total,
+    data?.pagination?.totalCount,
+    data?.pagination?.count,
+    data?.meta?.total,
+    data?.meta?.totalCount,
+  ];
+  for (const c of candidates) {
+    const n = Number(c);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return null;
 }
 
 function extractImages(product) {
@@ -84,7 +104,7 @@ function ImageCarousel({ imgs, alt, badges }) {
     <div className="relative h-44 bg-gray-50 overflow-hidden flex items-center justify-center group/img select-none">
       <div className="absolute top-2 left-2 z-10 flex flex-col gap-1 pointer-events-none">{badges}</div>
       {src ? (
-        <img key={src} src={resolveUrl(src)} alt={`${alt} ${idx + 1}`}
+        <img key={src} src={src} alt={`${alt} ${idx + 1}`}
           className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover/img:scale-105"
           onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextSibling?.classList.remove("hidden"); }} />
       ) : null}
@@ -118,7 +138,7 @@ function ThumbnailStrip({ imgs, onSelect, activeIdx }) {
       {imgs.slice(0, 5).map((img, i) => (
         <button key={i} onClick={(e) => { e.stopPropagation(); onSelect(i); }}
           className={`flex-shrink-0 w-9 h-9 rounded-lg overflow-hidden border-2 transition-all ${i === activeIdx ? "border-blue-500 shadow-sm" : "border-transparent opacity-50 hover:opacity-80 hover:border-gray-300"}`}>
-          <img src={resolveUrl(img)} alt="" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = ""; }} />
+          <img src={img} alt="" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = ""; }} />
         </button>
       ))}
     </div>
@@ -193,7 +213,7 @@ function ProductCard({ product, view }) {
       <div onClick={handleNav} className="bg-white border border-gray-100 rounded-2xl p-3 sm:p-4 flex gap-3 sm:gap-4 hover:shadow-lg transition-all duration-200 cursor-pointer group">
         <div className="relative w-20 h-20 sm:w-28 sm:h-28 flex-shrink-0 bg-gray-50 rounded-xl overflow-hidden">
           {listSrc ? (
-            <img src={resolveUrl(listSrc)} alt={product.name}
+            <img src={listSrc} alt={product.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               onError={(e) => { e.currentTarget.style.display="none"; }} />
           ) : (
@@ -255,7 +275,7 @@ function ProductCard({ product, view }) {
       <button onClick={handleWishlist} className="absolute top-2 right-2 z-20 bg-white/95 backdrop-blur p-1.5 rounded-full shadow hover:scale-110 transition-transform">
         <FiHeart className={`text-sm ${wished ? "fill-red-500 text-red-500" : "text-gray-400"}`} />
       </button>
-      <ImageCarousel imgs={imgs} alt={product.name} badges={badges} activeIdx={thumbIdx} onIdxChange={setThumbIdx} />
+      <ImageCarousel imgs={imgs} alt={product.name} badges={badges} />
       <ThumbnailStrip imgs={imgs} activeIdx={thumbIdx} onSelect={setThumbIdx} />
       <div className="p-3 flex flex-col flex-1">
         <span className="text-[10px] text-blue-500 font-semibold uppercase tracking-wide">{subcat}</span>
@@ -387,10 +407,13 @@ export default function Collection() {
   const [page,              setPage]              = useState(1);
   const [view,              setView]              = useState("grid");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [products,          setProducts]          = useState([]);
+  const [products,          setProducts]          = useState([]);  // ALL products for current filters
   const [totalCount,        setTotalCount]        = useState(0);
   const [loading,           setLoading]           = useState(false);
   const [error,             setError]             = useState(null);
+
+  // Bumped on every new fetch so a stale in-flight loop can't overwrite fresh data
+  const fetchIdRef = useRef(0);
 
   const rawSubcats  = useSelector(selectSubCategories(expandedCat));
   const subcatNames = ["All", ...rawSubcats.filter((s) => s.isActive !== false).map((s) => s.name)];
@@ -410,11 +433,14 @@ export default function Collection() {
     selectedSubcat !== "All",
   ].filter(Boolean).length;
 
-  const buildQuery = useCallback(() => {
+  // ── Build the query for ONE backend round-trip ─────────────────────────────
+  // page/limit are arguments now, NOT state — so changing the visible UI page
+  // does NOT rebuild the query and does NOT trigger a refetch.
+  const buildQuery = useCallback((pageNum, limit) => {
     const p = new URLSearchParams();
     if (selectedCategory)         p.set("category",    selectedCategory);
-    p.set("page",  page);
-    p.set("limit", PER_PAGE);
+    p.set("page",  pageNum);
+    p.set("limit", limit);
     if (selectedSubcat !== "All") p.set("subCategory", selectedSubcat);
     if (search)                   p.set("search",      search);
     if (priceMin > 0)             p.set("minPrice",    priceMin);
@@ -425,32 +451,91 @@ export default function Collection() {
     const sortMap = { price_asc:"price_asc", price_desc:"price_desc", rating:"rating_desc", newest:"newest", discount:"discount" };
     p.set("sort", sortMap[sortBy] || "popularity");
     return p.toString();
-  }, [selectedCategory, selectedSubcat, search, priceMin, priceMax, minRating, inStockOnly, hotOnly, sortBy, page]);
+  }, [selectedCategory, selectedSubcat, search, priceMin, priceMax, minRating, inStockOnly, hotOnly, sortBy]);
 
+  // ── Fetch EVERY matching product, then paginate on the client ──────────────
+  // Loops through the backend in FETCH_LIMIT-sized chunks until the full set is
+  // collected. Works whether the backend returns a total count or not, and even
+  // if it caps how many rows it returns per request.
   const fetchProducts = useCallback(async () => {
     if (!selectedCategory) return;
-    setLoading(true); setError(null);
+
+    const myFetchId = ++fetchIdRef.current;
+    setLoading(true);
+    setError(null);
+
     try {
-      const { data } = await axios.get(`${BACKEND_URL}/api/product/list?${buildQuery()}`);
-      if (data.success) {
-        const norm = (data.products || []).map((p) => ({ ...p, id: p._id || p.id }));
-        setProducts(norm);
-        setTotalCount(data.total ?? data.totalCount ?? norm.length);
-      } else {
-        setError(data.message || "Failed to load products.");
+      let all       = [];
+      let pageNum   = 1;
+      let total     = null;
+      const seen    = new Set();
+
+      while (true) {
+        const q = buildQuery(pageNum, FETCH_LIMIT);
+        const { data } = await axios.get(`${BACKEND_URL}/api/product/list?${q}`);
+
+        // A newer fetch started while this one was in flight — abandon this one.
+        if (myFetchId !== fetchIdRef.current) return;
+
+        if (!data || data.success === false) {
+          setError(data?.message || "Failed to load products.");
+          all = [];
+          break;
+        }
+
+        const batch = (data.products || data.items || data.data || [])
+          .map((p) => ({ ...p, id: p._id || p.id }))
+          .filter((p) => {
+            // Guard against duplicates if the backend ever repeats rows
+            if (p.id == null) return true;
+            if (seen.has(p.id)) return false;
+            seen.add(p.id);
+            return true;
+          });
+
+        all = all.concat(batch);
+
+        const reported = readTotal(data);
+        if (reported != null) total = reported;
+
+        // ── Stop conditions ──
+        if (batch.length === 0) break;                          // backend has no more rows
+        if (total != null && all.length >= total) break;        // collected everything reported
+        if (total == null && batch.length < FETCH_LIMIT) break; // no total info + short page = last page
+
+        pageNum += 1;
+        if (pageNum > 1000) break;                              // hard safety cap (~100k rows)
       }
+
+      if (myFetchId !== fetchIdRef.current) return;
+      setProducts(all);
+      setTotalCount(total != null ? Math.max(total, all.length) : all.length);
+      setPage(1);
     } catch (err) {
+      if (myFetchId !== fetchIdRef.current) return;
       setError(err?.response?.data?.message || "Something went wrong.");
+      setProducts([]);
+      setTotalCount(0);
     } finally {
-      setLoading(false);
+      if (myFetchId === fetchIdRef.current) setLoading(false);
     }
   }, [buildQuery, selectedCategory]);
 
+  // Refetch only when filters/category/search/sort change (not on page change)
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
+
   // On mobile, scroll past the sticky bottom nav (≈64px)
   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [page]);
 
-  const totalPages = Math.ceil(totalCount / PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(totalCount / PER_PAGE));
+
+  // Client-side page slice — this is what the UI actually renders
+  const pagedProducts = products.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  // Keep the current page in range when the result set shrinks (e.g. new filter)
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [totalPages, page]);
 
   const resetFilters = () => {
     setSearch(""); setPriceMin(0); setPriceMax(500);
@@ -558,10 +643,17 @@ export default function Collection() {
       {/* AVAILABILITY */}
       <div>
         <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Availability</p>
-        <div className="flex flex-col gap-1">
-          <ToggleSwitch val={inStockOnly} onToggle={() => { setInStockOnly(!inStockOnly); setPage(1) }} label="✓ In Stock Only" />
-          <ToggleSwitch val={hotOnly} onToggle={() => { setHotOnly(!hotOnly); setPage(1) }} label="🔥 Hot Deals Only" />
-        </div>
+        {[
+          [inStockOnly, () => { setInStockOnly(!inStockOnly); setPage(1); }, "bg-green-600 border-green-600", "✓ In Stock Only"],
+          [hotOnly,     () => { setHotOnly(!hotOnly);         setPage(1); }, "bg-orange-500 border-orange-500", "🔥 Hot Deals Only"],
+        ].map(([val, fn, cls, label]) => (
+          <label key={label} className="flex items-center gap-2.5 py-2 px-1 cursor-pointer rounded-xl hover:bg-gray-50 transition-colors">
+            <div onClick={fn} className={`w-4 h-4 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${val ? cls : "border-gray-300"}`}>
+              {val && <FiCheck className="text-white" size={9} />}
+            </div>
+            <span className="text-sm text-gray-600">{label}</span>
+          </label>
+        ))}
       </div>
     </aside>
   );
@@ -592,7 +684,7 @@ export default function Collection() {
     );
     return (
       <div className={view === "grid" ? "grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4" : "space-y-3"}>
-        {products.map((p) => <ProductCard key={p.id} product={p} view={view} />)}
+        {pagedProducts.map((p) => <ProductCard key={p.id} product={p} view={view} />)}
       </div>
     );
   };
